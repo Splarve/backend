@@ -3,13 +3,28 @@ import type { CreateJobPostInput, UpdateJobPostInput } from "./job-post.validati
 
 export const jobPostService = {
     
+    async getAllJobPosts(
+        orgId: string
+    ) {
+        const { data, error } = await supabase
+            .from("job_info")
+            .select("*")
+            .eq("org_id", orgId);
+
+        if (error) {
+            throw new Error(error.message);
+        }
+
+        return data;
+    },
+
     async getJobPostById(
         id: string
     ) {
         const { data, error } = await supabase
             .from("job_info")
             .select("*")
-            .eq("id", id)
+            .eq("job_info_id", id)
             .single();
 
         if (error) {
@@ -42,7 +57,7 @@ export const jobPostService = {
         const { data, error } = await supabase
             .from("job_info")
             .update(input)
-            .eq("id", id)
+            .eq("job_info_id", id)
             .select("*")
             .single();
 
@@ -59,7 +74,7 @@ export const jobPostService = {
         const { data, error } = await supabase
             .from("job_info")
             .delete()
-            .eq("id", id)
+            .eq("job_info_id", id)
             .select("*")
             .single();
 

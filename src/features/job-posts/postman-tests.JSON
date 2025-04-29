@@ -1,0 +1,332 @@
+{
+  "info": {
+    "name": "Job Posts API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Job Posts",
+      "item": [
+        {
+          "name": "Get All Job Posts for Organization",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts/org/{{orgId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts", "org", "{{orgId}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test response structure",
+                  "pm.test(\"Response is an array\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(Array.isArray(jsonData)).to.be.true;",
+                  "});",
+                  "",
+                  "// Test that response contains expected properties",
+                  "pm.test(\"Job posts have required fields\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('job_info_id');",
+                  "        pm.expect(jsonData[0]).to.have.property('org_id');",
+                  "        pm.expect(jsonData[0]).to.have.property('title');",
+                  "        pm.expect(jsonData[0]).to.have.property('description');",
+                  "    }",
+                  "});",
+                  "",
+                  "// Save first job ID for other tests if available",
+                  "if (pm.response.json().length > 0) {",
+                  "    pm.environment.set(\"jobId\", pm.response.json()[0].job_info_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Job Post by ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts/{{existingJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts", "{{existingJobId}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test response structure",
+                  "pm.test(\"Response has expected properties\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('job_info_id');",
+                  "    pm.expect(jsonData).to.have.property('org_id');",
+                  "    pm.expect(jsonData).to.have.property('title');",
+                  "    pm.expect(jsonData).to.have.property('description');",
+                  "    pm.expect(jsonData).to.have.property('location');",
+                  "    pm.expect(jsonData).to.have.property('salary_range');",
+                  "    pm.expect(jsonData).to.have.property('tags');",
+                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"jobId\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Job Post",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Senior Backend Developer\",\n    \"description\": \"We are looking for an experienced backend developer to join our team.\",\n    \"location\": \"Remote / San Francisco\",\n    \"salary_range\": \"$120k - $160k\",\n    \"tags\": [\"node.js\", \"typescript\", \"express\", \"supabase\"],\n    \"comp_specific_label\": \"Engineering\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "// Test response structure",
+                  "pm.test(\"Response has expected properties\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('job_info_id');",
+                  "    pm.expect(jsonData).to.have.property('org_id');",
+                  "    pm.expect(jsonData).to.have.property('title');",
+                  "    pm.expect(jsonData.title).to.eql('Senior Backend Developer');",
+                  "});",
+                  "",
+                  "// Save the created job ID for future tests",
+                  "pm.environment.set(\"createdJobId\", pm.response.json().job_info_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Job Post",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts/{{createdJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts", "{{createdJobId}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Senior Backend Developer (Updated)\",\n    \"salary_range\": \"$130k - $170k\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test that the update was successful",
+                  "pm.test(\"Job post was updated correctly\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.title).to.eql('Senior Backend Developer (Updated)');",
+                  "    pm.expect(jsonData.salary_range).to.eql('$130k - $170k');",
+                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Job Post",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts/{{createdJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts", "{{createdJobId}}"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status",
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test that the correct job was deleted",
+                  "pm.test(\"Correct job post was deleted\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Create Job Post",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"not-a-uuid\",\n    \"title\": \"\",\n    \"description\": \"Missing title should cause validation error\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status for validation error",
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "// Test error response structure",
+                  "pm.test(\"Response indicates validation error\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error');",
+                  "    pm.expect(jsonData).to.have.property('details');",
+                  "    pm.expect(jsonData.error).to.eql('Body validation failed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid ID Parameter",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts/not-a-valid-uuid",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts", "not-a-valid-uuid"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test response status for invalid parameter",
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "// Test error response structure",
+                  "pm.test(\"Response indicates parameter validation error\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error');",
+                  "    pm.expect(jsonData.error).to.eql('URL parameter validation failed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "orgId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "existingJobId",
+      "value": "44444444-4444-4444-4444-444444444444"
+    }
+  ]
+}

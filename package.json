@@ -2,9 +2,16 @@
   "name": "backend",
   "module": "index.ts",
   "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun --watch run src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist"
+  },
   "private": true,
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
     "@types/node": "^22.15.3"
   },
   "peerDependencies": {
@@ -12,7 +19,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
+    "cors": "^2.8.5",
     "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
     "zod": "^3.24.3"
   }
 }
