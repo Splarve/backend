@@ -12,7 +12,7 @@ jobPostRouter.get(
   validate.params(orgIdParamSchema),
   async (req, res, next) => {
     try {
-      const jobPosts = await jobPostService.getAllJobPosts(req.params.orgId as UUID);
+      const jobPosts = await jobPostService.getAllJobPosts(req.params.orgId as string);
       res.json(jobPosts);
     } catch (error) {
       next(error);

@@ -6,7 +6,7 @@ export const jobIdParamSchema = z.object({
 });
 
 export const orgIdParamSchema = z.object({
-    org_id: z.string().uuid('Invalid organization ID'),
+    orgId: z.string().uuid('Invalid organization ID'),
 });
 
 export const createJobPostSchema = z.object({

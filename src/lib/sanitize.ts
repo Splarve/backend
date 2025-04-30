@@ -16,10 +16,19 @@ const purify = DOMPurify(window as any); // Use 'as any' due to potential type m
  */
 export function sanitizeHtml(dirty: string): string {
   // Return sanitized string
-  // We can configure allowed tags and attributes here if needed,
-  // but the default configuration is usually a good starting point.
-  // Example: purify.sanitize(dirty, { USE_PROFILES: { html: true } });
-  return purify.sanitize(dirty);
+  // We configure DOMPurify to allow specific safe HTML tags for formatting
+  // while still preventing XSS by default.
+  return purify.sanitize(dirty, {
+    ALLOWED_TAGS: [
+      'b', 'i', 'u', 'strong', 'em', // Basic emphasis
+      'p', 'br', // Paragraphs and line breaks
+      'h2', 'h3', 'h4', // Headings (avoid h1 for semantics)
+      'ul', 'ol', 'li', // Lists
+      'a' // Links (attributes will be checked by default)
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'title'] // Allow common link attributes
+    // KEEP_CONTENT: true is the default
+  });
 }
 
 /**

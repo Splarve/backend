@@ -311,6 +311,203 @@
               }
             }
           ]
+        },
+        {
+          "name": "Create Job Post with Markdown Description",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Markdown Test Job\",\n    \"description\": \"## Job Details\\n* Requirement 1\\n* Requirement 2\\n\\n**Bold text** and *italic text* included.\",\n    \"location\": \"Remote\",\n    \"salary_range\": \"$80k - $100k\",\n    \"tags\": [\"markdown\", \"test\"],\n    \"comp_specific_label\": \"Testing Dept\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has expected properties and Markdown content\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('job_info_id');",
+                  "    pm.expect(jsonData).to.have.property('org_id');",
+                  "    pm.expect(jsonData).to.have.property('title');",
+                  "    pm.expect(jsonData.title).to.eql('Markdown Test Job');",
+                  "    pm.expect(jsonData.description).to.include('## Job Details');",
+                  "    pm.expect(jsonData.description).to.include('* Requirement 1');",
+                  "});",
+                  "",
+                  "// Save the created job ID for cleanup or further tests",
+                  "pm.environment.set(\"markdownJobId\", pm.response.json().job_info_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Job Post with XSS Attempt in Title",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"<script>alert('XSS')</script>Job Title\",\n    \"description\": \"Attempting XSS in title.\",\n    \"location\": \"Nowhere\",\n    \"salary_range\": \"$1 - $2\",\n    \"tags\": [\"security\", \"test\"],\n    \"comp_specific_label\": \"Security Test\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expecting validation error (400) or successful creation (201) with sanitized output.",
+                  "// Adjust the status check based on your API's behavior (sanitization vs. rejection).",
+                  "pm.test(\"Status code is 400 or 201 (check for sanitization)\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test(\"Title should be sanitized if created\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.title).to.not.include('<script>');",
+                  "        // Add specific check for how your API sanitizes, e.g.:",
+                  "        // pm.expect(jsonData.title).to.eql('&lt;script&gt;alert(\\'XSS\\')&lt;/script&gt;Job Title');",
+                  "        pm.environment.set(\"xssJobId\", pm.response.json().job_info_id); // Save ID for potential cleanup",
+                  "    });",
+                  "} else {",
+                  "    pm.test(\"Response indicates validation error if status is 400\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('error');",
+                  "        pm.expect(jsonData.error).to.contain('validation failed'); ",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Error - Create Job Post with Invalid Tags Type",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Invalid Tags Test\",\n    \"description\": \"Tags should be an array, not a string.\",\n    \"location\": \"Validation Land\",\n    \"salary_range\": \"$50k - $70k\",\n    \"tags\": \"not-an-array\",\n    \"comp_specific_label\": \"Validation\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 400\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test(\"Response indicates validation error for tags\", function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error');",
+                  "    pm.expect(jsonData).to.have.property('details');",
+                  "    // Check if the error message mentions 'tags' or invalid type",
+                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('tags');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Job Post with SQL Injection Attempt in Description",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "job-posts"]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"SQL Injection Test Title\",\n    \"description\": \"Normal description. '; DROP TABLE job_info; -- \",\n    \"location\": \"Security Test Location\",\n    \"salary_range\": \"$1 - $10\",\n    \"tags\": [\"sql\", \"injection\", \"test\"],\n    \"comp_specific_label\": \"Security Dept\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Expecting successful creation (201) because input should be treated as literal string,",
+                  "// OR potentially a 500 if the DB layer fails unexpectedly, OR 400 if validation catches it (less likely for generic string fields).",
+                  "pm.test(\"Status code is 201 (or possibly 400/500)\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400, 500]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test(\"Description should contain the attempted SQL injection string literally\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.description).to.include(\"'; DROP TABLE job_info; -- \");",
+                  "    });",
+                  "    // Save ID for cleanup if needed",
+                  "    pm.environment.set(\"sqlInjectionJobId\", pm.response.json().job_info_id);",
+                  "} else if (pm.response.code === 400) {",
+                  "   pm.test(\"Response indicates validation error if status is 400\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('error');",
+                  "    });",
+                  "} else if (pm.response.code === 500) {",
+                  "   pm.test(\"Response indicates server error if status is 500\", function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('error');",
+                  "        pm.expect(jsonData.error).to.include('Internal Server Error'); // Or similar generic message",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     }

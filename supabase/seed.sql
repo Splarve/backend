@@ -46,4 +46,28 @@ VALUES
     '$130,000 - $170,000',
     ARRAY['javascript', 'python', 'fintech', 'fullstack'],
     'Annual bonuses and professional development budget'
+  ),
+  (
+    '77777777-7777-7777-7777-777777777777',
+    '11111111-1111-1111-1111-111111111111',
+    'AI Research Scientist',
+    '## About the Role
+We are seeking a talented AI Research Scientist to push the boundaries of machine learning.
+*   Develop novel algorithms
+*   Publish research findings
+*   Collaborate with engineering teams',
+    'Palo Alto, CA',
+    '$150,000 - $200,000',
+    ARRAY['python', 'tensorflow', 'pytorch', 'research', 'ai'],
+    'Conference travel budget and stock options'
+  ),
+  (
+    '88888888-8888-8888-8888-888888888888',
+    '22222222-2222-2222-2222-222222222222',
+    'Marketing Manager',
+    'Lead our marketing efforts to promote sustainable energy solutions. **Experience required**.',
+    'Austin, TX',
+    '$100,000 - $130,000',
+    ARRAY['marketing', 'strategy', 'renewable', 'management'],
+    'Generous PTO and remote work options'
   );
