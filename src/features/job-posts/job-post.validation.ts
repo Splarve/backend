@@ -5,6 +5,10 @@ export const jobIdParamSchema = z.object({
     id: z.string().uuid('Invalid job ID'),
 });
 
+export const orgIdParamSchema = z.object({
+    org_id: z.string().uuid('Invalid organization ID'),
+});
+
 export const createJobPostSchema = z.object({
     org_id : z.string().uuid('Invalid organization ID'),
     title: z.string().min(1, 'Title is required').transform(sanitizePlainText),

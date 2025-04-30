@@ -1,5 +1,5 @@
 import express from "express";
-import { createJobPostSchema, updateJobPostSchema, jobIdParamSchema } from "./job-post.validation";
+import { orgIdParamSchema, createJobPostSchema, updateJobPostSchema, jobIdParamSchema } from "./job-post.validation";
 import { jobPostService } from "./job-post.service";
 import { validate } from "../../lib/validation";
 import type { UUID } from "crypto";
@@ -9,6 +9,7 @@ export const jobPostRouter = express.Router();
 // Get all job posts for an organization
 jobPostRouter.get(
   "/org/:orgId",
+  validate.params(orgIdParamSchema),
   async (req, res, next) => {
     try {
       const jobPosts = await jobPostService.getAllJobPosts(req.params.orgId as UUID);
