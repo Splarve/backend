@@ -21,6 +21,18 @@ export const createJobPostSchema = z.object({
 
 export const updateJobPostSchema = createJobPostSchema.partial()
 
+export const searchQuerySchema = z.object({
+  q: z
+    .string()
+    .min(2, "Search query must be at least 2 characters long")
+    .max(100, "Search query must be no more than 100 characters long")
+    .trim()
+    // Restore refine if needed, or keep commented if problematic
+    .refine(q => /^[\w\s\-\.,'"!?()&]+$/i.test(q), {
+      message: "Search query contains invalid characters"
+    })
+});
+
 export type CreateJobPostInput = z.infer<typeof createJobPostSchema>;
 export type UpdateJobPostInput = z.infer<typeof updateJobPostSchema>;
 

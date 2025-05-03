@@ -83,5 +83,18 @@ export const jobPostService = {
         }
 
         return data;
+    },
+
+    /**
+     * Full text search for job posts using Postgres tsvector and phrase/similarity support.
+     * @param {string} query - The validated and sanitized search query string
+     * @returns {Promise<any[]>} - Ranked job posts
+     */
+    async searchJobPosts(query: string) {
+        const { data, error } = await supabase.rpc('search_job_posts', { search_query: query });
+        if (error) {
+            throw new Error(`Failed to search job posts: ${error.message} (Code: ${error.code})`);
+        }
+        return data || [];
     }
 }

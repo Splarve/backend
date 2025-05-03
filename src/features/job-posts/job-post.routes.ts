@@ -1,8 +1,8 @@
 import express from "express";
-import { orgIdParamSchema, createJobPostSchema, updateJobPostSchema, jobIdParamSchema } from "./job-post.validation";
+import { orgIdParamSchema, createJobPostSchema, updateJobPostSchema, jobIdParamSchema, searchQuerySchema } from "./job-post.validation";
 import { jobPostService } from "./job-post.service";
 import { validate } from "../../lib/validation";
-import type { UUID } from "crypto";
+import type { Request, Response, NextFunction } from "express";
 
 export const jobPostRouter = express.Router();
 
@@ -16,6 +16,26 @@ jobPostRouter.get(
       res.json(jobPosts);
     } catch (error) {
       next(error);
+    }
+  }
+);
+
+// Full text search for job posts
+// MUST be defined before the /:id route
+jobPostRouter.get(
+  "/search",
+  validate.query(searchQuerySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validatedQuery = res.locals.validatedQuery as { q: string };
+      const q = validatedQuery.q;
+
+      const results = await jobPostService.searchJobPosts(q);
+      res.json(results);
+    } catch (error) {
+      // Intentionally leaving basic error log here for route-level debugging
+      // console.error("Error in /search route handler:", error); 
+      next(error); // Pass error to the global error handler
     }
   }
 );

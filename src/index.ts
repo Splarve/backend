@@ -18,9 +18,13 @@ app.use('/api/job-posts', jobPostRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // Log minimal info: the stack trace (includes message)
   console.error(err.stack);
+  
+  // Send response to client
   res.status(err.statusCode || 500).json({
     error: err.message || 'Internal Server Error',
+    details: err.details || undefined, 
   });
 });
 
