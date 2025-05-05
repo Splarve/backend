@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import 'dotenv/config';
 import { jobPostRouter } from './features/job-posts';
+import { orgSettingsRouter } from './features/org-settings';
 
 // Initialize express app
 const app = express();
@@ -15,6 +16,7 @@ app.use(express.json()); // Parse JSON bodies
 
 // Routes
 app.use('/api/v1/workspaces/:org_handle/job-posts', jobPostRouter);
+app.use('/api/v1/workspaces/:org_handle/settings', orgSettingsRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
