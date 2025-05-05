@@ -1,26 +1,23 @@
 {
   "info": {
-    "name": "Job Posts API Tests",
+    "name": "Job Posts API Tests (Workspace)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Job Posts",
+      "name": "Job Posts (Workspace: {{orgHandle}})",
       "item": [
         {
-          "name": "Get All Job Posts for Organization",
+          "name": "Get All Job Posts for Workspace",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/org/{{orgId}}",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "org", "{{orgId}}"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ]
           },
           "event": [
@@ -28,75 +25,36 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status",
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
+                  "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "",
-                  "// Test response structure",
-                  "pm.test(\"Response is an array\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(Array.isArray(jsonData)).to.be.true;",
-                  "});",
+                  "pm.test(\"Response is an array\", () => { pm.expect(Array.isArray(pm.response.json())).to.be.true; });",
                   "",
-                  "// Test that response contains expected properties",
-                  "pm.test(\"Job posts have required fields\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    if (jsonData.length > 0) {",
-                  "        pm.expect(jsonData[0]).to.have.property('job_info_id');",
-                  "        pm.expect(jsonData[0]).to.have.property('org_id');",
-                  "        pm.expect(jsonData[0]).to.have.property('title');",
-                  "        pm.expect(jsonData[0]).to.have.property('description');",
+                  "pm.test(\"Job posts have required fields (new schema)\", () => {",
+                  "    const jobs = pm.response.json();",
+                  "    if (jobs.length > 0) {",
+                  "        const job = jobs[0];",
+                  "        pm.expect(job).to.have.property('job_info_id');",
+                  "        pm.expect(job).to.have.property('org_id');",
+                  "        pm.expect(job).to.have.property('department_id');",
+                  "        pm.expect(job).to.have.property('job_title');",
+                  "        pm.expect(job).to.have.property('job_description');",
+                  "        pm.expect(job).to.have.property('location');",
+                  "        pm.expect(job).to.have.property('employment_type');",
+                  "        pm.expect(job).to.have.property('salary');",
+                  "        pm.expect(job).to.have.property('tags');",
+                  "        pm.expect(Array.isArray(job.tags)).to.be.true;",
+                  "        pm.expect(job).to.have.property('citizenship_requirements');",
+                  "        pm.expect(Array.isArray(job.citizenship_requirements)).to.be.true;",
+                  "        pm.expect(job).to.have.property('education_level');",
+                  "        pm.expect(Array.isArray(job.education_level)).to.be.true;",
+                  "        pm.expect(job).to.have.property('comp_specific_label');",
+                  "        pm.expect(Array.isArray(job.comp_specific_label)).to.be.true;",
+                  "        pm.expect(job).to.have.property('status');",
+                  "        pm.expect(job).to.have.property('applicant_count');",
+                  "        pm.expect(job).to.have.property('created_at');",
+                  "        pm.expect(job).to.have.property('updated_at');",
+                  "        pm.environment.set(\"jobId\", job.job_info_id);",
                   "    }",
-                  "});",
-                  "",
-                  "// Save first job ID for other tests if available",
-                  "if (pm.response.json().length > 0) {",
-                  "    pm.environment.set(\"jobId\", pm.response.json()[0].job_info_id);",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Get Job Post by ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts/{{existingJobId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "{{existingJobId}}"]
-            },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Test response status",
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "// Test response structure",
-                  "pm.test(\"Response has expected properties\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('job_info_id');",
-                  "    pm.expect(jsonData).to.have.property('org_id');",
-                  "    pm.expect(jsonData).to.have.property('title');",
-                  "    pm.expect(jsonData).to.have.property('description');",
-                  "    pm.expect(jsonData).to.have.property('location');",
-                  "    pm.expect(jsonData).to.have.property('salary_range');",
-                  "    pm.expect(jsonData).to.have.property('tags');",
-                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"jobId\"));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -105,46 +63,47 @@
           ]
         },
         {
-          "name": "Create Job Post",
+          "name": "Get Job Post by ID (Workspace)",
           "request": {
-            "method": "POST",
+            "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/{{existingJobId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "{{existingJobId}}"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Senior Backend Developer\",\n    \"description\": \"We are looking for an experienced backend developer to join our team.\",\n    \"location\": \"Remote / San Francisco\",\n    \"salary_range\": \"$120k - $160k\",\n    \"tags\": [\"node.js\", \"typescript\", \"express\", \"supabase\"],\n    \"comp_specific_label\": \"Engineering\"\n}"
-            }
+              { "key": "Content-Type", "value": "application/json" }
+            ]
           },
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status",
-                  "pm.test(\"Status code is 201\", function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
+                  "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "",
-                  "// Test response structure",
-                  "pm.test(\"Response has expected properties\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('job_info_id');",
-                  "    pm.expect(jsonData).to.have.property('org_id');",
-                  "    pm.expect(jsonData).to.have.property('title');",
-                  "    pm.expect(jsonData.title).to.eql('Senior Backend Developer');",
-                  "});",
-                  "",
-                  "// Save the created job ID for future tests",
-                  "pm.environment.set(\"createdJobId\", pm.response.json().job_info_id);"
+                  "pm.test(\"Response has expected properties (new schema)\", () => {",
+                  "    const job = pm.response.json();",
+                  "    pm.expect(job).to.have.property('job_info_id');",
+                  "    pm.expect(job.job_info_id).to.eql(pm.environment.get(\"existingJobId\"));",
+                  "    pm.expect(job).to.have.property('org_id');",
+                  "    pm.expect(job).to.have.property('department_id');",
+                  "    pm.expect(job).to.have.property('job_title');",
+                  "    pm.expect(job).to.have.property('job_description');",
+                  "    pm.expect(job).to.have.property('location');",
+                  "    pm.expect(job).to.have.property('employment_type');",
+                  "    pm.expect(job).to.have.property('salary');",
+                  "    pm.expect(job).to.have.property('tags');",
+                  "    pm.expect(Array.isArray(job.tags)).to.be.true;",
+                  "    pm.expect(job).to.have.property('citizenship_requirements');",
+                  "    pm.expect(Array.isArray(job.citizenship_requirements)).to.be.true;",
+                  "    pm.expect(job).to.have.property('education_level');",
+                  "    pm.expect(Array.isArray(job.education_level)).to.be.true;",
+                  "    pm.expect(job).to.have.property('comp_specific_label');",
+                  "    pm.expect(Array.isArray(job.comp_specific_label)).to.be.true;",
+                  "    pm.expect(job).to.have.property('status');",
+                  "    pm.expect(job).to.have.property('applicant_count');",
+                  "});"
                 ],
                 "type": "text/javascript"
               }
@@ -152,23 +111,62 @@
           ]
         },
         {
-          "name": "Update Job Post",
+          "name": "Create Job Post (Workspace)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"department_id\": \"{{departmentId}}\",\n    \"job_title\": \"Senior Backend Developer (Workspace Test)\",\n    \"job_description\": \"We are looking for an experienced backend developer for workspace {{orgHandle}}.\",\n    \"location\": \"Remote / San Francisco\",\n    \"employment_type\": \"Full-time\",\n    \"salary\": \"$120k - $160k\",\n    \"tags\": [\"node.js\", \"typescript\", \"express\", \"supabase\"],\n    \"citizenship_requirements\": [\"H1B\", \"Citizen\"],\n    \"education_level\": [\"Bachelors\"],\n    \"comp_specific_label\": [\"Engineering Team\", \"Backend Squad\"],\n    \"status\": \"published\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", () => { pm.response.to.have.status(201); });",
+                  "",
+                  "pm.test(\"Response has expected properties (new schema)\", () => {",
+                  "    const job = pm.response.json();",
+                  "    pm.expect(job).to.have.property('job_info_id');",
+                  "    pm.expect(job).to.have.property('org_id');",
+                  "    pm.expect(job).to.have.property('department_id', pm.environment.get(\"departmentId\"));",
+                  "    pm.expect(job).to.have.property('job_title', \"Senior Backend Developer (Workspace Test)\");",
+                  "    pm.expect(job).to.have.property('employment_type', \"Full-time\");",
+                  "    pm.expect(Array.isArray(job.comp_specific_label)).to.be.true;",
+                  "    pm.expect(job.comp_specific_label).to.include(\"Backend Squad\");",
+                  "    pm.expect(job).to.have.property('status', \"published\");",
+                  "    pm.environment.set(\"createdJobId\", job.job_info_id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Job Post (Workspace)",
           "request": {
             "method": "PUT",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/{{createdJobId}}",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/{{createdJobId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "{{createdJobId}}"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "{{createdJobId}}"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"title\": \"Senior Backend Developer (Updated)\",\n    \"salary_range\": \"$130k - $170k\"\n}"
+              "raw": "{\n    \"job_title\": \"Senior Backend Developer (Workspace Updated)\",\n    \"salary\": \"$130k - $170k\",\n    \"status\": \"draft\"\n}"
             }
           },
           "event": [
@@ -176,17 +174,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status",
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
+                  "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "",
-                  "// Test that the update was successful",
-                  "pm.test(\"Job post was updated correctly\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.title).to.eql('Senior Backend Developer (Updated)');",
-                  "    pm.expect(jsonData.salary_range).to.eql('$130k - $170k');",
-                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
+                  "pm.test(\"Job post was updated correctly (new schema)\", () => {",
+                  "    const job = pm.response.json();",
+                  "    pm.expect(job.job_title).to.eql(\"Senior Backend Developer (Workspace Updated)\");",
+                  "    pm.expect(job.salary).to.eql(\"$130k - $170k\");",
+                  "    pm.expect(job.status).to.eql(\"draft\");",
+                  "    pm.expect(job.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -195,19 +190,16 @@
           ]
         },
         {
-          "name": "Delete Job Post",
+          "name": "Delete Job Post (Workspace)",
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/{{createdJobId}}",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/{{createdJobId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "{{createdJobId}}"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "{{createdJobId}}"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ]
           },
           "event": [
@@ -215,15 +207,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status",
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
+                  "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "",
-                  "// Test that the correct job was deleted",
-                  "pm.test(\"Correct job post was deleted\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
+                  "pm.test(\"Correct job post was deleted\", () => {",
+                  "    const job = pm.response.json();",
+                  "    pm.expect(job.job_info_id).to.eql(pm.environment.get(\"createdJobId\"));",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -232,23 +220,20 @@
           ]
         },
         {
-          "name": "Validation Error - Create Job Post",
+          "name": "Validation Error - Create Job Post (Missing Department)",
           "request": {
             "method": "POST",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"org_id\": \"not-a-uuid\",\n    \"title\": \"\",\n    \"description\": \"Missing title should cause validation error\"\n}"
+              "raw": "{\n    \"job_title\": \"No Dept Title\",\n    \"job_description\": \"This should fail validation\",\n    \"location\": \"Nowhere\",\n    \"employment_type\": \"Full-time\",\n    \"salary\": \"$1\",\n    \"tags\": [\"fail\"],\n    \"citizenship_requirements\": [\"Any\"],\n    \"education_level\": [\"Any\"],\n    \"comp_specific_label\": [\"Failure Inc\"]\n}"
             }
           },
           "event": [
@@ -256,17 +241,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status for validation error",
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
+                  "pm.test(\"Status code is 400\", () => { pm.response.to.have.status(400); });",
                   "",
-                  "// Test error response structure",
-                  "pm.test(\"Response indicates validation error\", function () {",
-                  "    var jsonData = pm.response.json();",
+                  "pm.test(\"Response indicates validation error\", () => {",
+                  "    const jsonData = pm.response.json();",
                   "    pm.expect(jsonData).to.have.property('error');",
                   "    pm.expect(jsonData).to.have.property('details');",
                   "    pm.expect(jsonData.error).to.eql('Body validation failed');",
+                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('department_id');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -275,19 +257,16 @@
           ]
         },
         {
-          "name": "Invalid ID Parameter",
+          "name": "Invalid Job ID Parameter (Workspace)",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/not-a-valid-uuid",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/not-a-valid-uuid",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "not-a-valid-uuid"]
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "not-a-valid-uuid"]
             },
             "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Content-Type", "value": "application/json" }
             ]
           },
           "event": [
@@ -295,16 +274,14 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "// Test response status for invalid parameter",
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
+                  "// Expect 400 from Zod validation middleware",
+                  "pm.test(\"Status code is 400\", () => { pm.response.to.have.status(400); });",
                   "",
-                  "// Test error response structure",
-                  "pm.test(\"Response indicates parameter validation error\", function () {",
-                  "    var jsonData = pm.response.json();",
+                  "pm.test(\"Response indicates parameter validation error\", () => {",
+                  "    const jsonData = pm.response.json();",
                   "    pm.expect(jsonData).to.have.property('error');",
                   "    pm.expect(jsonData.error).to.eql('URL parameter validation failed');",
+                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('jobId');",
                   "});"
                 ],
                 "type": "text/javascript"
@@ -313,210 +290,46 @@
           ]
         },
         {
-          "name": "Create Job Post with Markdown Description",
-          "request": {
-            "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
-            },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Markdown Test Job\",\n    \"description\": \"## Job Details\\n* Requirement 1\\n* Requirement 2\\n\\n**Bold text** and *italic text* included.\",\n    \"location\": \"Remote\",\n    \"salary_range\": \"$80k - $100k\",\n    \"tags\": [\"markdown\", \"test\"],\n    \"comp_specific_label\": \"Testing Dept\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 201\", function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "",
-                  "pm.test(\"Response has expected properties and Markdown content\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('job_info_id');",
-                  "    pm.expect(jsonData).to.have.property('org_id');",
-                  "    pm.expect(jsonData).to.have.property('title');",
-                  "    pm.expect(jsonData.title).to.eql('Markdown Test Job');",
-                  "    pm.expect(jsonData.description).to.include('## Job Details');",
-                  "    pm.expect(jsonData.description).to.include('* Requirement 1');",
-                  "});",
-                  "",
-                  "// Save the created job ID for cleanup or further tests",
-                  "pm.environment.set(\"markdownJobId\", pm.response.json().job_info_id);"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create Job Post with XSS Attempt in Title",
-          "request": {
-            "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
-            },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"<script>alert('XSS')</script>Job Title\",\n    \"description\": \"Attempting XSS in title.\",\n    \"location\": \"Nowhere\",\n    \"salary_range\": \"$1 - $2\",\n    \"tags\": [\"security\", \"test\"],\n    \"comp_specific_label\": \"Security Test\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Expecting validation error (400) or successful creation (201) with sanitized output.",
-                  "// Adjust the status check based on your API's behavior (sanitization vs. rejection).",
-                  "pm.test(\"Status code is 400 or 201 (check for sanitization)\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400]);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 201) {",
-                  "    pm.test(\"Title should be sanitized if created\", function () {",
-                  "        var jsonData = pm.response.json();",
-                  "        pm.expect(jsonData.title).to.not.include('<script>');",
-                  "        // Add specific check for how your API sanitizes, e.g.:",
-                  "        // pm.expect(jsonData.title).to.eql('&lt;script&gt;alert(\\'XSS\\')&lt;/script&gt;Job Title');",
-                  "        pm.environment.set(\"xssJobId\", pm.response.json().job_info_id); // Save ID for potential cleanup",
-                  "    });",
-                  "} else {",
-                  "    pm.test(\"Response indicates validation error if status is 400\", function () {",
-                  "        var jsonData = pm.response.json();",
-                  "        pm.expect(jsonData).to.have.property('error');",
-                  "        pm.expect(jsonData.error).to.contain('validation failed'); ",
-                  "    });",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Validation Error - Create Job Post with Invalid Tags Type",
-          "request": {
-            "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
-            },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"Invalid Tags Test\",\n    \"description\": \"Tags should be an array, not a string.\",\n    \"location\": \"Validation Land\",\n    \"salary_range\": \"$50k - $70k\",\n    \"tags\": \"not-an-array\",\n    \"comp_specific_label\": \"Validation\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "",
-                  "pm.test(\"Response indicates validation error for tags\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('error');",
-                  "    pm.expect(jsonData).to.have.property('details');",
-                  "    // Check if the error message mentions 'tags' or invalid type",
-                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('tags');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Create Job Post with SQL Injection Attempt in Description",
-          "request": {
-            "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts"]
-            },
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"org_id\": \"{{orgId}}\",\n    \"title\": \"SQL Injection Test Title\",\n    \"description\": \"Normal description. '; DROP TABLE job_info; -- \",\n    \"location\": \"Security Test Location\",\n    \"salary_range\": \"$1 - $10\",\n    \"tags\": [\"sql\", \"injection\", \"test\"],\n    \"comp_specific_label\": \"Security Dept\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "// Expecting successful creation (201) because input should be treated as literal string,",
-                  "// OR potentially a 500 if the DB layer fails unexpectedly, OR 400 if validation catches it (less likely for generic string fields).",
-                  "pm.test(\"Status code is 201 (or possibly 400/500)\", function () {",
-                  "    pm.expect(pm.response.code).to.be.oneOf([201, 400, 500]);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 201) {",
-                  "    pm.test(\"Description should contain the attempted SQL injection string literally\", function () {",
-                  "        var jsonData = pm.response.json();",
-                  "        pm.expect(jsonData.description).to.include(\"'; DROP TABLE job_info; -- \");",
-                  "    });",
-                  "    // Save ID for cleanup if needed",
-                  "    pm.environment.set(\"sqlInjectionJobId\", pm.response.json().job_info_id);",
-                  "} else if (pm.response.code === 400) {",
-                  "   pm.test(\"Response indicates validation error if status is 400\", function () {",
-                  "        var jsonData = pm.response.json();",
-                  "        pm.expect(jsonData).to.have.property('error');",
-                  "    });",
-                  "} else if (pm.response.code === 500) {",
-                  "   pm.test(\"Response indicates server error if status is 500\", function () {",
-                  "        var jsonData = pm.response.json();",
-                  "        pm.expect(jsonData).to.have.property('error');",
-                  "        pm.expect(jsonData.error).to.include('Internal Server Error'); // Or similar generic message",
-                  "    });",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Full Text Search - Basic Query",
+          "name": "Invalid Organization Handle Parameter",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/search?q=engineer",
+              "raw": "{{baseUrl}}/api/v1/workspaces/INVALID_HANDLE*/job-posts",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "search"],
+              "path": ["api", "v1", "workspaces", "INVALID_HANDLE*", "job-posts"]
+            },
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                   "// Expect 400 from Zod validation middleware for org_handle format",
+                  "pm.test(\"Status code is 400\", () => { pm.response.to.have.status(400); });",
+                  "",
+                  "pm.test(\"Response indicates parameter validation error\", () => {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('error');",
+                  "    pm.expect(jsonData.error).to.eql('URL parameter validation failed');",
+                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('org_handle');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Full Text Search - Basic Query (Workspace)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/search?q=engineer",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "search"],
               "query": [
                 { "key": "q", "value": "engineer" }
               ]
@@ -530,14 +343,10 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
+                  "pm.test(\"Status code is 200\", () => { pm.response.to.have.status(200); });",
                   "",
-                  "pm.test(\"Response is an array\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(Array.isArray(jsonData)).to.be.true;",
-                  "});"
+                  "pm.test(\"Response is an array\", () => { pm.expect(Array.isArray(pm.response.json())).to.be.true; });",
+                  "// Add more specific tests if needed, e.g., check if results belong to the orgHandle"
                 ],
                 "type": "text/javascript"
               }
@@ -545,47 +354,13 @@
           ]
         },
         {
-          "name": "Full Text Search - Phrase Query",
+          "name": "Full Text Search - Empty Query (Workspace Validation)",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/job-posts/search?q=\"AI Research Scientist\"",
+              "raw": "{{baseUrl}}/api/v1/workspaces/{{orgHandle}}/job-posts/search?q=",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "search"],
-              "query": [
-                { "key": "q", "value": "\"AI Research Scientist\"" }
-              ]
-            },
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ]
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "pm.test(\"Response is an array\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(Array.isArray(jsonData)).to.be.true;",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Full Text Search - Empty Query (Validation Test)",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts/search?q=",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "search"],
+              "path": ["api", "v1", "workspaces", "{{orgHandle}}", "job-posts", "search"],
               "query": [
                 { "key": "q", "value": "" }
               ]
@@ -599,83 +374,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "pm.test(\"Error message for empty/invalid query\", function () {",
-                  "    var jsonData = pm.response.json();",
+                  "pm.test(\"Status code is 400\", () => { pm.response.to.have.status(400); });",
+                  "pm.test(\"Error message for empty/invalid query\", () => {",
+                  "    const jsonData = pm.response.json();",
                   "    pm.expect(jsonData).to.have.property('error');",
-                  "    pm.expect(jsonData.error).to.include('too short');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Full Text Search - Query Too Short",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts/search?q=a",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "search"],
-              "query": [
-                { "key": "q", "value": "a" }
-              ]
-            },
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ]
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "pm.test(\"Error message indicates query too short\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('error');",
-                  "    pm.expect(jsonData.error).to.include('too short');",
-                  "});"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ]
-        },
-        {
-          "name": "Full Text Search - Query Too Long",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/job-posts/search?q=this+query+is+definitely+way+too+long+to+be+considered+a+valid+search+term+for+this+particular+endpoint+and+should+trigger+a+validation+error+because+we+set+a+maximum+length+of+one+hundred+characters",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "job-posts", "search"],
-              "query": [
-                { "key": "q", "value": "this query is definitely way too long to be considered a valid search term for this particular endpoint and should trigger a validation error because we set a maximum length of one hundred characters" }
-              ]
-            },
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ]
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "pm.test(\"Status code is 400\", function () {",
-                  "    pm.response.to.have.status(400);",
-                  "});",
-                  "pm.test(\"Error message indicates query too long\", function () {",
-                  "    var jsonData = pm.response.json();",
-                  "    pm.expect(jsonData).to.have.property('error');",
-                  "    pm.expect(jsonData.error).to.include('too long');",
+                  "    pm.expect(jsonData.error).to.eql('Query parameter validation failed');",
+                  "    pm.expect(JSON.stringify(jsonData.details)).to.include('too short');",
                   "});"
                 ],
                 "type": "text/javascript"

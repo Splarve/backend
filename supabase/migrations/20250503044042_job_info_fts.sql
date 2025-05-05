@@ -10,12 +10,15 @@ CREATE OR REPLACE FUNCTION update_job_info_search_vector()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.search_vector :=
-        setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B') ||
+        setweight(to_tsvector('english', coalesce(NEW.job_title, '')), 'A') ||
+        setweight(to_tsvector('english', coalesce(NEW.job_description, '')), 'B') ||
         setweight(to_tsvector('english', coalesce(NEW.location, '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(NEW.salary_range, '')), 'C') ||
+        setweight(to_tsvector('english', coalesce(NEW.salary, '')), 'C') ||
         setweight(to_tsvector('english', array_to_string(NEW.tags, ' ')), 'B') ||
-        setweight(to_tsvector('english', coalesce(NEW.comp_specific_label, '')), 'D');
+        setweight(to_tsvector('english', NEW.employment_type::text), 'C') ||
+        setweight(to_tsvector('english', array_to_string(NEW.citizenship_requirements, ' ')), 'D') ||
+        setweight(to_tsvector('english', array_to_string(NEW.education_level, ' ')), 'D') ||
+        setweight(to_tsvector('english', array_to_string(NEW.comp_specific_label, ' ')), 'D');
     RETURN NEW; -- Return the modified row
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
@@ -28,12 +31,15 @@ FOR EACH ROW EXECUTE FUNCTION update_job_info_search_vector();
 -- 4. IMPORTANT: Update existing rows to populate the search_vector initially
 -- Run this *after* creating the column and trigger
 UPDATE public.job_info SET search_vector =
-    setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(description, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(job_title, '')), 'A') ||
+    setweight(to_tsvector('english', coalesce(job_description, '')), 'B') ||
     setweight(to_tsvector('english', coalesce(location, '')), 'C') ||
-    setweight(to_tsvector('english', coalesce(salary_range, '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(salary, '')), 'C') ||
     setweight(to_tsvector('english', array_to_string(tags, ' ')), 'B') ||
-    setweight(to_tsvector('english', coalesce(comp_specific_label, '')), 'D')
+    setweight(to_tsvector('english', employment_type::text), 'C') ||
+    setweight(to_tsvector('english', array_to_string(citizenship_requirements, ' ')), 'D') ||
+    setweight(to_tsvector('english', array_to_string(education_level, ' ')), 'D') ||
+    setweight(to_tsvector('english', array_to_string(comp_specific_label, ' ')), 'D')
 WHERE search_vector IS NULL; -- Add WHERE clause for safety if run multiple times
 
 
@@ -46,23 +52,28 @@ CREATE INDEX IF NOT EXISTS idx_job_info_search_vector ON public.job_info USING G
 -- CREATE INDEX IF NOT EXISTS idx_job_comp_label_trgm ON public.job_info USING gin (comp_specific_label gin_trgm_ops);
 
 
--- 6. Recreate the search function using RETURNS TABLE (This block was already here)
-CREATE OR REPLACE FUNCTION search_job_posts(search_query text)
--- Explicitly define all returned columns, including the calculated score
+-- 6. Recreate the search function using RETURNS TABLE
+-- Add org_id_filter parameter
+CREATE OR REPLACE FUNCTION search_job_posts(search_query text, org_id_filter UUID)
 RETURNS TABLE(
     job_info_id UUID,
     org_id UUID,
-    title TEXT,
-    description TEXT,
-    applicant_count INTEGER,
+    department_id UUID,
+    job_title TEXT,
+    job_description TEXT,
     location TEXT,
-    salary_range TEXT,
+    employment_type employment_type,
+    salary TEXT,
     tags TEXT[],
-    comp_specific_label TEXT,
+    citizenship_requirements TEXT[],
+    education_level TEXT[],
+    status job_status,
+    applicant_count INTEGER,
+    comp_specific_label TEXT[],
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
-    search_vector tsvector, -- Include the search_vector column itself if needed later
-    relevance_score REAL -- Add the calculated score column
+    search_vector tsvector,
+    relevance_score REAL
 )
 LANGUAGE plpgsql STABLE PARALLEL SAFE AS $$
 DECLARE
@@ -74,14 +85,19 @@ BEGIN
 
     RETURN QUERY
     SELECT
-        ji.job_info_id, -- List all columns explicitly instead of ji.*
+        ji.job_info_id,
         ji.org_id,
-        ji.title,
-        ji.description,
-        ji.applicant_count,
+        ji.department_id,
+        ji.job_title,
+        ji.job_description,
         ji.location,
-        ji.salary_range,
+        ji.employment_type,
+        ji.salary,
         ji.tags,
+        ji.citizenship_requirements,
+        ji.education_level,
+        ji.status,
+        ji.applicant_count,
         ji.comp_specific_label,
         ji.created_at,
         ji.updated_at,
@@ -89,19 +105,25 @@ BEGIN
         -- Calculate rank based on tsvector match and similarity
         (ts_rank(ji.search_vector, web_query) +
          GREATEST(
-             similarity(ji.title, search_query),
-             similarity(ji.description, search_query),
+             similarity(ji.job_title, search_query),
+             similarity(ji.job_description, search_query),
              similarity(ji.location, search_query),
-             similarity(ji.comp_specific_label, search_query)
-         ))::real AS relevance_score -- Cast score to REAL to match return type
+             similarity(array_to_string(ji.tags, ' '), search_query),
+             similarity(array_to_string(ji.comp_specific_label, ' '), search_query)
+         ))::real AS relevance_score
     FROM
         public.job_info ji
     WHERE
-        ji.search_vector @@ web_query
-        OR similarity(ji.title, search_query) > similarity_threshold
-        OR similarity(ji.description, search_query) > similarity_threshold
-        OR similarity(ji.location, search_query) > similarity_threshold
-        OR similarity(ji.comp_specific_label, search_query) > similarity_threshold
+        ji.org_id = org_id_filter -- Filter by organization ID
+        AND (
+            -- Original search conditions
+            ji.search_vector @@ web_query
+            OR similarity(ji.job_title, search_query) > similarity_threshold
+            OR similarity(ji.job_description, search_query) > similarity_threshold
+            OR similarity(ji.location, search_query) > similarity_threshold
+            OR similarity(array_to_string(ji.tags, ' '), search_query) > similarity_threshold
+            OR similarity(array_to_string(ji.comp_specific_label, ' '), search_query) > similarity_threshold
+        )
     ORDER BY
         relevance_score DESC
     LIMIT 50;
