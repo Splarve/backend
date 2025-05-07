@@ -23,4 +23,85 @@ export const updateOrgSettingsSchema = z.object({
 // --- Exported Types ---
 
 export type OrgHandleParams = z.infer<typeof orgHandleParamSchema>;
-export type UpdateOrgSettingsInput = z.infer<typeof updateOrgSettingsSchema>; 
+export type UpdateOrgSettingsInput = z.infer<typeof updateOrgSettingsSchema>;
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     OrgSettings:
+ *       type: object
+ *       description: Represents the settings for an organization.
+ *       properties:
+ *         org_id:
+ *           type: string
+ *           format: uuid
+ *           description: Unique identifier of the organization.
+ *         org_name:
+ *           type: string
+ *           description: Name of the organization.
+ *           example: "Acme Corp"
+ *         org_handle:
+ *           type: string
+ *           description: Unique handle for the organization.
+ *           example: "acme-corp"
+ *         org_description:
+ *           type: string
+ *           nullable: true
+ *           description: Description of the organization (can be HTML).
+ *           example: "<p>A leading provider of innovative solutions.</p>"
+ *         org_logo:
+ *           type: string
+ *           format: url
+ *           nullable: true
+ *           description: URL of the organization's logo.
+ *           example: "https://example.com/logo.png"
+ *         org_industry:
+ *           type: string
+ *           nullable: true
+ *           description: Industry the organization belongs to.
+ *           example: "Technology"
+ *         org_location:
+ *           type: string
+ *           nullable: true
+ *           description: Location of the organization.
+ *           example: "San Francisco, CA"
+ *         website:
+ *           type: string
+ *           format: url
+ *           nullable: true
+ *           description: URL of the organization's website.
+ *           example: "https://acme-corp.example.com"
+ *         # Add other fields that are returned by your orgSettingsService.getOrgSettings method
+ *
+ *     UpdateOrgSettingsInput:
+ *       type: object
+ *       description: Fields for updating an organization's settings. All fields are optional.
+ *       properties:
+ *         org_name:
+ *           type: string
+ *           nullable: true
+ *           description: New name for the organization.
+ *         org_description:
+ *           type: string
+ *           nullable: true
+ *           description: New description for the organization (can be HTML).
+ *         org_logo:
+ *           type: string
+ *           format: url
+ *           nullable: true
+ *           description: New URL for the organization's logo.
+ *         org_industry:
+ *           type: string
+ *           nullable: true
+ *           description: New industry for the organization.
+ *         org_location:
+ *           type: string
+ *           nullable: true
+ *           description: New location for the organization.
+ *         website:
+ *           type: string
+ *           format: url
+ *           nullable: true
+ *           description: New URL for the organization's website.
+ */ 

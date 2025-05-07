@@ -1,2 +1,3 @@
-// index.ts
-export * from './org-settings.routes'; 
+export { orgSettingsRouter } from './org-settings.routes';
+export * from './org-settings.validation';
+export * from './org-settings.service';

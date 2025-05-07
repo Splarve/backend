@@ -12,6 +12,13 @@ import type { Request, Response, NextFunction } from "express";
 // Create router with mergeParams enabled
 const router = express.Router({ mergeParams: true });
 
+/**
+ * @openapi
+ * tags:
+ *   name: Organization Settings
+ *   description: API endpoints for managing organization settings.
+ */
+
 // Error handling wrapper (Replicated from job-posts)
 const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(err => {
@@ -28,6 +35,44 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
 };
 
 // GET /api/v1/workspaces/:org_handle/settings
+/**
+ * @openapi
+ * /workspaces/{org_handle}/settings:
+ *   get:
+ *     tags:
+ *       - Organization Settings
+ *     summary: Get organization settings
+ *     description: Retrieves the settings for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *     responses:
+ *       200:
+ *         description: The organization's settings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OrgSettings'
+ *       404:
+ *         description: Organization not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error' # Defined in index.ts or a shared schema file
+ *       500:
+ *         description: Internal Server Error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *     security:
+ *       - bearerAuth: []
+ */
 router.get(
     "/",
     validate.params(orgHandleParamSchema),
@@ -38,6 +83,48 @@ router.get(
 );
 
 // PUT /api/v1/workspaces/:org_handle/settings
+/**
+ * @openapi
+ * /workspaces/{org_handle}/settings:
+ *   put:
+ *     tags:
+ *       - Organization Settings
+ *     summary: Update organization settings
+ *     description: Updates the settings for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateOrgSettingsInput'
+ *     responses:
+ *       200:
+ *         description: Organization settings updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OrgSettings'
+ *       400:
+ *         description: Validation error or invalid input.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Organization not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.put(
     "/",
     validate.params(orgHandleParamSchema),

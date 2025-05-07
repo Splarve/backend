@@ -18,6 +18,13 @@ const router = express.Router({ mergeParams: true });
 // All routes defined here will be prefixed with /workspaces/:org_handle/job-posts
 // mergeParams: true allows this router to access :org_handle from the mount point
 
+/**
+ * @openapi
+ * tags:
+ *   name: Job Posts
+ *   description: API endpoints for managing job posts within an organization.
+ */
+
 // Middleware to handle AppErrors
 const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(err => {
@@ -36,6 +43,46 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
 };
 
 // Get all job posts for the workspace
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts:
+ *   get:
+ *     tags:
+ *       - Job Posts
+ *     summary: Get all job posts for an organization
+ *     description: Retrieves a list of all job posts associated with the specified organization handle.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *     responses:
+ *       200:
+ *         description: A list of job posts.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/JobPost'
+ *       404:
+ *         description: Organization not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Internal Server Error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *     security:
+ *       - bearerAuth: []
+ */
 router.get(
   "/",
   validate.params(orgHandleParamSchema),
@@ -47,6 +94,53 @@ router.get(
 
 // Full text search for job posts within the workspace
 // IMPORTANT: Search route must be defined before routes with specific IDs like /:jobId
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts/search:
+ *   get:
+ *     tags:
+ *       - Job Posts
+ *     summary: Search job posts within an organization
+ *     description: Performs a full-text search for job posts based on a query string for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *       - name: q
+ *         in: query
+ *         required: true
+ *         description: The search query string (min 2, max 100 characters).
+ *         schema:
+ *           type: string
+ *           minLength: 2
+ *           maxLength: 100
+ *           pattern: "^[\\w\\s\\-\\.,'\"!?()&]+$"
+ *     responses:
+ *       200:
+ *         description: A list of matching job posts.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/JobPost' # Or a specific search result schema if different
+ *       400:
+ *         description: Invalid search query.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Organization not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.get(
   "/search",
   validate.params(orgHandleParamSchema),
@@ -60,6 +154,43 @@ router.get(
 );
 
 // Get specific job post by ID within the workspace
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts/{jobId}:
+ *   get:
+ *     tags:
+ *       - Job Posts
+ *     summary: Get a specific job post by ID
+ *     description: Retrieves a single job post by its ID for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *       - name: jobId
+ *         in: path
+ *         required: true
+ *         description: The UUID of the job post.
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: The requested job post.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/JobPost'
+ *       404:
+ *         description: Organization or Job post not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.get(
   "/:jobId",
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
@@ -71,6 +202,48 @@ router.get(
 );
 
 // Create a new job post within the workspace
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts:
+ *   post:
+ *     tags:
+ *       - Job Posts
+ *     summary: Create a new job post
+ *     description: Creates a new job post for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateJobPostInput'
+ *     responses:
+ *       201:
+ *         description: Job post created successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/JobPost'
+ *       400:
+ *         description: Validation error or invalid input (e.g., department not found).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Organization not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.post(
   "/",
   validate.params(orgHandleParamSchema),
@@ -83,6 +256,51 @@ router.post(
 );
 
 // Update a job post within the workspace
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts/{jobId}:
+ *   put:
+ *     tags:
+ *       - Job Posts
+ *     summary: Update an existing job post
+ *     description: Updates an existing job post by its ID for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *       - name: jobId
+ *         in: path
+ *         required: true
+ *         description: The UUID of the job post to update.
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UpdateJobPostInput'
+ *     responses:
+ *       200:
+ *         description: Job post updated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/JobPost'
+ *       400:
+ *         description: Validation error or invalid input.
+ *       404:
+ *         description: Organization or Job post not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.put(
   "/:jobId",
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
@@ -95,6 +313,45 @@ router.put(
 );
 
 // Delete a job post within the workspace
+/**
+ * @openapi
+ * /workspaces/{org_handle}/job-posts/{jobId}:
+ *   delete:
+ *     tags:
+ *       - Job Posts
+ *     summary: Delete a job post
+ *     description: Deletes a job post by its ID for the specified organization.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *       - name: jobId
+ *         in: path
+ *         required: true
+ *         description: The UUID of the job post to delete.
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Job post deleted successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/JobPost' # Typically returns the deleted item
+ *       204:
+ *         description: Job post deleted successfully (No Content).
+ *       404:
+ *         description: Organization or Job post not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
 router.delete(
   "/:jobId",
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),

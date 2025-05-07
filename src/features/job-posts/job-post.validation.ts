@@ -68,3 +68,190 @@ export type CreateJobPostInput = z.infer<typeof createJobPostSchema>;
 export type UpdateJobPostInput = z.infer<typeof updateJobPostSchema>;
 export type SearchQueryParams = z.infer<typeof searchQuerySchema>;
 
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     EmploymentTypeEnum:
+ *       type: string
+ *       enum:
+ *         - Full-time
+ *         - Part-time
+ *         - Contract
+ *         - Temporary
+ *         - Internship
+ *         - Volunteer
+ *         - Apprenticeship
+ *         - Per Diem
+ * 
+ *     JobStatusEnum:
+ *       type: string
+ *       enum:
+ *         - draft
+ *         - published
+ *
+ *     JobPost:
+ *       type: object
+ *       properties:
+ *         job_info_id:
+ *           type: string
+ *           format: uuid
+ *           description: Unique identifier for the job post.
+ *         org_id:
+ *           type: string
+ *           format: uuid
+ *           description: Identifier of the organization this job post belongs to.
+ *         department_id:
+ *           type: string
+ *           format: uuid
+ *           description: Identifier of the department this job post belongs to.
+ *         job_title:
+ *           type: string
+ *           description: Title of the job.
+ *           example: "Senior Software Engineer"
+ *         job_description:
+ *           type: string
+ *           description: Detailed description of the job (can be HTML).
+ *           example: "<p>Join our team to build amazing things...</p>"
+ *         location:
+ *           type: string
+ *           description: Location of the job.
+ *           example: "Remote / San Francisco, CA"
+ *         employment_type:
+ *           $ref: '#/components/schemas/EmploymentTypeEnum'
+ *         salary:
+ *           type: string
+ *           description: Salary information or range.
+ *           example: "$120,000 - $150,000 per year"
+ *         tags:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Tags associated with the job post.
+ *           example: ["TypeScript", "Node.js", "React"]
+ *         citizenship_requirements:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Citizenship requirements for the job.
+ *         education_level:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Required education level.
+ *         status:
+ *           $ref: '#/components/schemas/JobStatusEnum'
+ *         applicant_count:
+ *           type: integer
+ *           description: Number of applicants for this job.
+ *           example: 0
+ *         comp_specific_label:
+ *           type: array
+ *           items:
+ *             type: string
+ *           description: Company-specific labels or categories.
+ *         created_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of when the job post was created.
+ *         updated_at:
+ *           type: string
+ *           format: date-time
+ *           description: Timestamp of when the job post was last updated.
+ *
+ *     CreateJobPostInput: # Corresponds to createJobPostSchema
+ *       type: object
+ *       required:
+ *         - department_id
+ *         - job_title
+ *         - job_description
+ *         - location
+ *         - employment_type
+ *         - salary
+ *         - tags
+ *         - citizenship_requirements
+ *         - education_level
+ *         - comp_specific_label
+ *       properties:
+ *         department_id:
+ *           type: string
+ *           format: uuid
+ *         job_title:
+ *           type: string
+ *         job_description:
+ *           type: string
+ *         location:
+ *           type: string
+ *         employment_type:
+ *           $ref: '#/components/schemas/EmploymentTypeEnum'
+ *         salary:
+ *           type: string
+ *         tags:
+ *           type: array
+ *           items:
+ *             type: string
+ *         citizenship_requirements:
+ *           type: array
+ *           items:
+ *             type: string
+ *         education_level:
+ *           type: array
+ *           items:
+ *             type: string
+ *         comp_specific_label:
+ *           type: array
+ *           items:
+ *             type: string
+ *         status:
+ *           $ref: '#/components/schemas/JobStatusEnum'
+ *           description: Defaults to 'draft' if not provided.
+ *           nullable: true
+ *
+ *     UpdateJobPostInput: # Corresponds to updateJobPostSchema
+ *       type: object
+ *       description: All fields are optional for update.
+ *       properties:
+ *         department_id:
+ *           type: string
+ *           format: uuid
+ *           nullable: true
+ *         job_title:
+ *           type: string
+ *           nullable: true
+ *         job_description:
+ *           type: string
+ *           nullable: true
+ *         location:
+ *           type: string
+ *           nullable: true
+ *         employment_type:
+ *           $ref: '#/components/schemas/EmploymentTypeEnum'
+ *           nullable: true
+ *         salary:
+ *           type: string
+ *           nullable: true
+ *         tags:
+ *           type: array
+ *           items:
+ *             type: string
+ *           nullable: true
+ *         citizenship_requirements:
+ *           type: array
+ *           items:
+ *             type: string
+ *           nullable: true
+ *         education_level:
+ *           type: array
+ *           items:
+ *             type: string
+ *           nullable: true
+ *         comp_specific_label:
+ *           type: array
+ *           items:
+ *             type: string
+ *           nullable: true
+ *         status:
+ *           $ref: '#/components/schemas/JobStatusEnum'
+ *           nullable: true
+ */
+
