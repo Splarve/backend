@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import 'dotenv/config';
 import { jobPostRouter } from './features/job-posts';
 import { orgSettingsRouter } from './features/org-settings';
+import { organizationRouter, invitationActionsRouter, appPermissionsRouter } from './features/organizations';
 
 // Initialize express app
 const app = express();
@@ -91,6 +92,9 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Routes
+app.use('/api/v1/app-permissions', appPermissionsRouter);
+app.use('/api/v1/organizations', organizationRouter);
+app.use('/api/v1/invitations', invitationActionsRouter);
 app.use('/api/v1/workspaces/:org_handle/job-posts', jobPostRouter);
 app.use('/api/v1/workspaces/:org_handle/settings', orgSettingsRouter);
 

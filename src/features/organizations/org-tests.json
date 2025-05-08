@@ -1,0 +1,354 @@
+{
+	"info": {
+		"_postman_id": "YOUR_UNIQUE_COLLECTION_ID_V2",
+		"name": "Splarve RBAC & Invite Workflow",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"description": "Testing organization creation, RBAC (role management), and invitation workflows."
+	},
+	"item": [
+		{
+			"name": "Setup & Org Creation",
+			"item": [
+				{
+					"name": "1. [USER A] Create Organization",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+									"const jsonData = pm.response.json();",
+									"if (jsonData.org_handle) { pm.environment.set(\"created_org_handle\", jsonData.org_handle); console.log('Set created_org_handle to: ' + jsonData.org_handle); }",
+									"if (jsonData.org_id) { pm.environment.set(\"created_org_id\", jsonData.org_id); console.log('Set created_org_id to: ' + jsonData.org_id); }",
+									"// Clear potentially old custom role ID",
+									"pm.environment.unset(\"created_custom_role_id\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_a_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"org_name\": \"RBAC Test Org {{$randomInt}}\",\n  \"org_handle\": \"rbac-test-org-{{$randomInt}}\",\n  \"org_description\": \"Org for testing roles and invites.\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations", "host": [ "{{baseUrl}}" ], "path": [ "organizations" ] },
+						"description": "User A creates an org. \n\n**Action Needed After Run:** Manually find the `org_role_id` for the 'Member' role of this new org in DB and set `system_member_role_id` env var."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Application Permissions",
+			"item": [
+				{
+					"name": "List App Permissions",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"Response is an array\", function () { pm.expect(pm.response.json()).to.be.an('array'); });",
+									"// Optional: Store specific permissions if needed for other tests",
+									"// const permissions = pm.response.json();",
+									"// const createJobPerm = permissions.find(p => p.permission_id === 'job-posts:create');",
+									"// if (createJobPerm) pm.environment.set('perm_job_create', createJobPerm.permission_id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" } ],
+						"url": { "raw": "{{baseUrl}}/app-permissions", "host": [ "{{baseUrl}}" ], "path": [ "app-permissions" ] },
+						"description": "Get the list of all possible permissions in the application."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Role Management (by User A)",
+			"item": [
+				{
+					"name": "Create Custom Role",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); });",
+									"const jsonData = pm.response.json();",
+									"pm.test(\"Role name matches\", function () { pm.expect(jsonData.role_name).to.eql(pm.environment.get('created_custom_role_name')); });",
+									"pm.test(\"Assigned permissions are correct\", function () { pm.expect(jsonData.assigned_permissions).to.have.members([pm.environment.get('app_permission_1')]); });",
+									"if (jsonData.org_role_id) { pm.environment.set(\"created_custom_role_id\", jsonData.org_role_id); console.log('Set created_custom_role_id to: ' + jsonData.org_role_id); }"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_a_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role_name\": \"{{created_custom_role_name}}\",\n  \"permission_ids\": [\"{{app_permission_1}}\"]\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles" ] },
+						"description": "User A (Owner) creates a new custom role in the organization."
+					},
+					"response": []
+				},
+				{
+					"name": "List Org Roles",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"const roles = pm.response.json();",
+									"pm.test(\"Response is an array with at least 3 roles (Owner, Member, Custom)\", function () { ",
+									"    pm.expect(roles).to.be.an('array').with.lengthOf.at.least(3); ",
+									"});",
+									"const customRole = roles.find(r => r.org_role_id === pm.environment.get('created_custom_role_id'));",
+									"pm.test(\"Custom role exists in list\", function () { pm.expect(customRole).to.not.be.undefined; });",
+									"pm.test(\"Custom role has correct permission assigned\", function () { pm.expect(customRole.permissions).to.include(pm.environment.get('app_permission_1')); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" } ],
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles" ] },
+						"description": "User A lists roles in the organization, verifying the new custom role is present."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Custom Role",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"const jsonData = pm.response.json();",
+									"pm.test(\"Role name is updated\", function () { pm.expect(jsonData.role_name).to.eql(pm.environment.get('created_custom_role_name') + ' Updated'); });",
+									"pm.test(\"Permissions are updated\", function () { ",
+									"    pm.expect(jsonData.permissions).to.have.members([pm.environment.get('app_permission_1'), pm.environment.get('app_permission_2')]); ",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_a_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role_name\": \"{{created_custom_role_name}} Updated\",\n  \"permission_ids\": [\"{{app_permission_1}}\", \"{{app_permission_2}}\"]\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles/{{created_custom_role_id}}", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles", "{{created_custom_role_id}}" ] },
+						"description": "User A updates the name and permissions of the custom role."
+					},
+					"response": []
+				},
+				{
+					"name": "Assign Custom Role to User B",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+									"const jsonData = pm.response.json();",
+									"pm.test(\"Correct user ID updated\", function () { pm.expect(jsonData.user_id).to.eql(pm.environment.get('user_b_id')); });",
+									"pm.test(\"Correct role ID assigned\", function () { pm.expect(jsonData.org_role_id).to.eql(pm.environment.get('created_custom_role_id')); });"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_a_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"org_role_id\": \"{{created_custom_role_id}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/members/{{user_b_id}}/role", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "members", "{{user_b_id}}", "role" ] },
+						"description": "User A changes User B's role from 'Member' (assuming they joined) to the custom role."
+					},
+					"response": []
+				},
+				{
+					"name": "Try Delete Role (Assigned - Expect 409)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 409 (Conflict)\", function () { pm.response.to.have.status(409); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "DELETE",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" } ],
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles/{{created_custom_role_id}}", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles", "{{created_custom_role_id}}" ] },
+						"description": "User A tries to delete the custom role while User B is assigned to it. Should fail."
+					},
+					"response": []
+				},
+				{
+					"name": "Assign 'Member' Role back to User B",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_a_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"org_role_id\": \"{{system_member_role_id}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/members/{{user_b_id}}/role", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "members", "{{user_b_id}}", "role" ] },
+						"description": "User A changes User B's role back to the default 'Member' role to allow custom role deletion."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Custom Role (Success)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "DELETE",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" } ],
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles/{{created_custom_role_id}}", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles", "{{created_custom_role_id}}" ] },
+						"description": "User A successfully deletes the custom role now that it's unassigned."
+					},
+					"response": []
+				},
+				{
+					"name": "Try Delete System Role (Expect 400)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 400\", function () { pm.response.to.have.status(400); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "DELETE",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" } ],
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles/{{system_member_role_id}}", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles", "{{system_member_role_id}}" ] },
+						"description": "User A tries to delete the default 'Member' role. Should fail."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Invitation Workflow (Updated)",
+			"item": [
+				{
+					"name": "Invite User B (for Accept Test)",
+					"event": [
+						{ "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 201\", function () { pm.response.to.have.status(201); }); const jsonData = pm.response.json(); if (jsonData.token) { pm.environment.set(\"invite_token_1\", jsonData.token); console.log('Set invite_token_1'); }" ], "type": "text/javascript" } }
+					],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"invited_email\": \"{{user_b_email}}\",\n  \"org_role_id\": \"{{system_member_role_id}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/invitations", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "invitations" ] },
+						"description": "Invite User B (assigning Member role)."
+					},
+					"response": []
+				},
+				{
+					"name": "[USER B] Accept Invitation",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); }); pm.test(\"Response message is correct\", function () { pm.expect(pm.response.json().message).to.eql(\"Invitation accepted successfully!\"); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_b_jwt}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"token\": \"{{invite_token_1}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/invitations/accept", "host": [ "{{baseUrl}}" ], "path": [ "invitations", "accept" ] }
+					},
+					"response": []
+				},
+				{
+					"name": "Try Invite User B Again (Expect 409 - Already Member)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 409 (Conflict)\", function () { pm.response.to.have.status(409); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"invited_email\": \"{{user_b_email}}\",\n  \"org_role_id\": \"{{system_member_role_id}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/invitations", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "invitations" ] },
+						"description": "User A tries to invite User B again after they've already accepted and joined. Should fail."
+					},
+					"response": []
+				},
+				{
+					"name": "Invite User B (for Decline Test)",
+					"event": [ { "listen": "test", "script": { "exec": [ "// User B is already a member, so this should fail with 409 now based on our updated logic.", "// We need a different user or org to test decline cleanly, or remove user B first.", "pm.test(\"Status code is 409 (Expected Failure)\", function () { pm.response.to.have.status(409); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "POST",
+						"header": [ { "key": "Authorization", "value": "Bearer {{user_a_jwt}}" }, { "key": "Content-Type", "value": "application/json" } ],
+						"body": { "mode": "raw", "raw": "{\n  \"invited_email\": \"{{user_b_email}}\",\n  \"org_role_id\": \"{{system_member_role_id}}\"\n}" },
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/invitations", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "invitations" ] },
+						"description": "**NOTE:** This request will now FAIL (409) because User B is already a member. To test decline, you'd need a 3rd user, remove User B from the org first, or test against a different org."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Permission Denied Tests",
+			"item": [
+				{
+					"name": "[USER B] Try Create Role (Expect 403)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 403 (Forbidden)\", function () { pm.response.to.have.status(403); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_b_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role_name\": \"B's Role\",\n  \"permission_ids\": []\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/roles", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "roles" ] },
+						"description": "User B (as a Member with no initial permissions) tries to create a role. Should fail."
+					},
+					"response": []
+				},
+				{
+					"name": "[USER B] Try Invite User (Expect 403)",
+					"event": [ { "listen": "test", "script": { "exec": [ "pm.test(\"Status code is 403 (Forbidden)\", function () { pm.response.to.have.status(403); });" ], "type": "text/javascript" } } ],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{user_b_jwt}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"invited_email\": \"some_other_user@example.com\",\n  \"org_role_id\": \"{{system_member_role_id}}\"\n}"
+						},
+						"url": { "raw": "{{baseUrl}}/organizations/{{created_org_handle}}/invitations", "host": [ "{{baseUrl}}" ], "path": [ "organizations", "{{created_org_handle}}", "invitations" ] },
+						"description": "User B (as a Member) tries to invite someone. Should fail."
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
