@@ -36,7 +36,7 @@ async function testAuthenticatedAccess() {
   console.log('Attempting to fetch organizations with AUTHENTICATED user JWT...');
   try {
     const { data, error } = await supabase
-      .from('departments') // Or any other table you restricted for 'authenticated' role
+      .from('organizations') // Or any other table you restricted for 'authenticated' role
       .select('*')
       .limit(1);
 
