@@ -5,6 +5,7 @@ import 'dotenv/config';
 import { jobPostRouter } from './features/job-posts';
 import { orgSettingsRouter } from './features/org-settings';
 import { organizationRouter, invitationActionsRouter, appPermissionsRouter } from './features/organizations';
+import { currentUserRouter } from './features/currentUser';
 
 // Initialize express app
 const app = express();
@@ -97,6 +98,7 @@ app.use('/api/v1/organizations', organizationRouter);
 app.use('/api/v1/invitations', invitationActionsRouter);
 app.use('/api/v1/organizations/:org_handle/job-posts', jobPostRouter);
 app.use('/api/v1/organizations/:org_handle/settings', orgSettingsRouter);
+app.use('/api/v1/me', currentUserRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
