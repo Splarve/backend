@@ -95,8 +95,8 @@ if (process.env.NODE_ENV !== 'production') {
 app.use('/api/v1/app-permissions', appPermissionsRouter);
 app.use('/api/v1/organizations', organizationRouter);
 app.use('/api/v1/invitations', invitationActionsRouter);
-app.use('/api/v1/workspaces/:org_handle/job-posts', jobPostRouter);
-app.use('/api/v1/workspaces/:org_handle/settings', orgSettingsRouter);
+app.use('/api/v1/organizations/:org_handle/job-posts', jobPostRouter);
+app.use('/api/v1/organizations/:org_handle/settings', orgSettingsRouter);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

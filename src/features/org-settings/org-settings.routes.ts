@@ -8,6 +8,7 @@ import { orgSettingsService } from "./org-settings.service";
 import { validate } from "../../lib/validation";
 import { AppError } from "../../lib/errors";
 import type { Request, Response, NextFunction } from "express";
+import { authenticate, type AuthenticatedRequest } from "../../lib/auth.middleware";
 
 // Create router with mergeParams enabled
 const router = express.Router({ mergeParams: true });
@@ -20,7 +21,7 @@ const router = express.Router({ mergeParams: true });
  */
 
 // Error handling wrapper (Replicated from job-posts)
-const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+const handleErrors = (fn: Function) => (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(err => {
         if (err instanceof AppError) {
             res.status(err.statusCode).json({ error: err.message, context: err.context });
@@ -34,10 +35,10 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
     });
 };
 
-// GET /api/v1/workspaces/:org_handle/settings
+// GET /api/v1/organizations/:org_handle/settings
 /**
  * @openapi
- * /workspaces/{org_handle}/settings:
+ * /organizations/{org_handle}/settings:
  *   get:
  *     tags:
  *       - Organization Settings
@@ -75,17 +76,18 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
  */
 router.get(
     "/",
+    authenticate,
     validate.params(orgHandleParamSchema),
-    handleErrors(async (req: Request, res: Response) => {
+    handleErrors(async (req: AuthenticatedRequest, res: Response) => {
         const settings = await orgSettingsService.getOrgSettings(req.params.org_handle!); // Added non-null assertion
         res.json(settings);
     })
 );
 
-// PUT /api/v1/workspaces/:org_handle/settings
+// PUT /api/v1/organizations/:org_handle/settings
 /**
  * @openapi
- * /workspaces/{org_handle}/settings:
+ * /organizations/{org_handle}/settings:
  *   put:
  *     tags:
  *       - Organization Settings
@@ -127,9 +129,10 @@ router.get(
  */
 router.put(
     "/",
+    authenticate,
     validate.params(orgHandleParamSchema),
     validate.body(updateOrgSettingsSchema),
-    handleErrors(async (req: Request, res: Response) => {
+    handleErrors(async (req: AuthenticatedRequest, res: Response) => {
         const updatedSettings = await orgSettingsService.updateOrgSettings(
             req.params.org_handle!, // Added non-null assertion
             req.body

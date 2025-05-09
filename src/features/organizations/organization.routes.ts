@@ -157,7 +157,7 @@ router.post(
  * /organizations/{org_handle}/roles:
  *   post:
  *     summary: Create a new role within an organization
- *     tags: [Organizations, Roles]
+ *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -221,7 +221,7 @@ router.post(
  * /organizations/{org_handle}/roles:
  *   get:
  *     summary: List all roles within an organization
- *     tags: [Organizations, Roles]
+ *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -280,7 +280,7 @@ router.get(
  * /organizations/{org_handle}/roles/{org_role_id}:
  *   put:
  *     summary: Update an existing role within an organization
- *     tags: [Organizations, Roles]
+ *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -364,7 +364,7 @@ router.put(
  * /organizations/{org_handle}/roles/{org_role_id}:
  *   delete:
  *     summary: Delete a custom role within an organization
- *     tags: [Organizations, Roles]
+ *     tags: [Organizations]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -441,7 +441,7 @@ router.delete(
  * /organizations/{org_handle}/members/{member_user_id}/role:
  *   put:
  *     summary: Assign or change a member's role within an organization
- *     tags: [Organizations, Roles, Members]
+ *     tags: [Organizations, Members]
  *     security:
  *       - bearerAuth: []
  *     parameters:

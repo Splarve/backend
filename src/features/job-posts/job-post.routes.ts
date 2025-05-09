@@ -10,12 +10,13 @@ import { jobPostService } from "./job-post.service";
 import { validate } from "../../lib/validation";
 import { AppError } from "../../lib/errors";
 import type { Request, Response, NextFunction } from "express";
+import { authenticate, type AuthenticatedRequest } from "../../lib/auth.middleware";
 
 // Create a new router instance with mergeParams enabled
 const router = express.Router({ mergeParams: true });
 
 // Define the base path for this feature router
-// All routes defined here will be prefixed with /workspaces/:org_handle/job-posts
+// All routes defined here will be prefixed with /organizations/:org_handle/job-posts
 // mergeParams: true allows this router to access :org_handle from the mount point
 
 /**
@@ -26,7 +27,7 @@ const router = express.Router({ mergeParams: true });
  */
 
 // Middleware to handle AppErrors
-const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+const handleErrors = (fn: Function) => (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(err => {
         if (err instanceof AppError) {
             res.status(err.statusCode).json({ error: err.message, context: err.context });
@@ -45,7 +46,7 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
 // Get all job posts for the workspace
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts:
+ * /organizations/{org_handle}/job-posts:
  *   get:
  *     tags:
  *       - Job Posts
@@ -85,8 +86,9 @@ const handleErrors = (fn: Function) => (req: Request, res: Response, next: NextF
  */
 router.get(
   "/",
+  authenticate,
   validate.params(orgHandleParamSchema),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const jobPosts = await jobPostService.getAllJobPosts(req.params.org_handle!);
     res.json(jobPosts);
   })
@@ -96,7 +98,7 @@ router.get(
 // IMPORTANT: Search route must be defined before routes with specific IDs like /:jobId
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts/search:
+ * /organizations/{org_handle}/job-posts/search:
  *   get:
  *     tags:
  *       - Job Posts
@@ -143,9 +145,10 @@ router.get(
  */
 router.get(
   "/search",
+  authenticate,
   validate.params(orgHandleParamSchema),
   validate.query(searchQuerySchema),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle } = req.params;
     const validatedQuery = res.locals.validatedQuery as { q: string };
     const results = await jobPostService.searchJobPosts(org_handle!, validatedQuery.q);
@@ -156,7 +159,7 @@ router.get(
 // Get specific job post by ID within the workspace
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts/{jobId}:
+ * /organizations/{org_handle}/job-posts/{jobId}:
  *   get:
  *     tags:
  *       - Job Posts
@@ -193,8 +196,9 @@ router.get(
  */
 router.get(
   "/:jobId",
+  authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const jobPost = await jobPostService.getJobPostById(org_handle!, jobId!);
     res.json(jobPost);
@@ -204,7 +208,7 @@ router.get(
 // Create a new job post within the workspace
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts:
+ * /organizations/{org_handle}/job-posts:
  *   post:
  *     tags:
  *       - Job Posts
@@ -246,9 +250,10 @@ router.get(
  */
 router.post(
   "/",
+  authenticate,
   validate.params(orgHandleParamSchema),
   validate.body(createJobPostSchema),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle } = req.params;
     const newJobPost = await jobPostService.createJobPost(org_handle!, req.body);
     res.status(201).json(newJobPost);
@@ -258,7 +263,7 @@ router.post(
 // Update a job post within the workspace
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts/{jobId}:
+ * /organizations/{org_handle}/job-posts/{jobId}:
  *   put:
  *     tags:
  *       - Job Posts
@@ -303,9 +308,10 @@ router.post(
  */
 router.put(
   "/:jobId",
+  authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
   validate.body(updateJobPostSchema),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const updatedJobPost = await jobPostService.updateJobPost(org_handle!, jobId!, req.body);
     res.json(updatedJobPost);
@@ -315,7 +321,7 @@ router.put(
 // Delete a job post within the workspace
 /**
  * @openapi
- * /workspaces/{org_handle}/job-posts/{jobId}:
+ * /organizations/{org_handle}/job-posts/{jobId}:
  *   delete:
  *     tags:
  *       - Job Posts
@@ -354,8 +360,9 @@ router.put(
  */
 router.delete(
   "/:jobId",
+  authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
-  handleErrors(async (req: Request, res: Response) => {
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const deletedJobPost = await jobPostService.deleteJobPost(org_handle!, jobId!);
     res.json(deletedJobPost);
