@@ -522,6 +522,141 @@ router.put(
   }
 );
 
+/**
+ * @openapi
+ * /organizations/{org_handle}/member-permissions:
+ *   get:
+ *     summary: Get the current authenticated user's permissions for the organization
+ *     tags: [Organizations, Members]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: org_handle
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The handle of the organization
+ *     responses:
+ *       200:
+ *         description: An array of permission strings for the user in this organization.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: string
+ *               example: ["org:read", "members:read", "members:invite"]
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (user not a member of the organization perhaps - service will return empty array)
+ *       404:
+ *         description: Organization not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/:org_handle/member-permissions",
+  authenticate, // Ensure user is logged in
+  validate.params(orgHandleParamSchema), // Validate the org_handle
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
+    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+  },
+  // No specific checkPermission here, as we are GETTING permissions, not acting on one.
+  // The service layer will correctly return empty if user is not a member.
+  async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !req.user.id) {
+        return next(new AppError("Authentication error: User ID not found.", 401));
+      }
+      if (!req.org_id) {
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+
+      const permissions = await organizationService.getUserPermissionsForOrganization(
+        req.user.id,
+        req.org_id
+      );
+      res.status(200).json(permissions);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /organizations/{org_handle}/members:
+ *   get:
+ *     summary: List all members of an organization
+ *     tags: [Organizations, Members]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: org_handle
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The handle of the organization
+ *     responses:
+ *       200:
+ *         description: An array of organization members with their user details and roles.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   userId: 
+ *                     type: string
+ *                     format: uuid
+ *                   email:
+ *                     type: string
+ *                     format: email
+ *                   roleId:
+ *                     type: string
+ *                     format: uuid
+ *                   roleName:
+ *                     type: string
+ *                 example:
+ *                   - userId: "123e4567-e89b-12d3-a456-426614174000"
+ *                     email: "member1@example.com"
+ *                     roleId: "abcdef01-e89b-12d3-a456-426614174000"
+ *                     roleName: "Editor"
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (user lacks 'members:read' permission)
+ *       404:
+ *         description: Organization not found
+ *       500:
+ *         description: Internal server error
+ */
+router.get(
+  "/:org_handle/members",
+  authenticate,                         
+  validate.params(orgHandleParamSchema), 
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { 
+    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+  },
+  checkPermission("members:read"),    
+  async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
+    try {
+      if (!req.org_id) { 
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+      
+      const members = await organizationService.listOrganizationMembers(req.org_id);
+      res.status(200).json(members);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 // This new router will handle global invitation actions like accepting/declining
 // It's separate because it's not tied to a specific organization context via org_handle in the path
 // for the person *accepting* the invite.

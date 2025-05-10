@@ -786,6 +786,77 @@ export const organizationService = {
     }
 
     return updatedMember;
-  }
+  },
 
+  async getUserPermissionsForOrganization(userId: string, orgId: string): Promise<string[]> {
+    const { data: memberData, error: memberError } = await supabase
+      .from("organization_members")
+      .select("org_role_id")
+      .eq("org_id", orgId)
+      .eq("user_id", userId)
+      .single();
+
+    if (memberError) {
+      if (memberError.code === "PGRST116") { return []; }
+      console.error(`Error fetching user membership for permissions:`, memberError);
+      throw new AppError("Failed to verify user membership for permissions.", 500);
+    }
+    if (!memberData || !memberData.org_role_id) { return []; }
+
+    const { data: permissionsData, error: permissionsError } = await supabase
+      .from("organization_role_permissions")
+      .select("permission_id")
+      .eq("org_role_id", memberData.org_role_id);
+
+    if (permissionsError) {
+      console.error(`Error fetching permissions for role:`, permissionsError);
+      throw new AppError("Failed to retrieve permissions.", 500);
+    }
+    return permissionsData ? permissionsData.map(p => p.permission_id) : [];
+  },
+
+  async listOrganizationMembers(orgId: string) {
+    const { data, error } = await supabase
+      .from("organization_members")
+      .select(`
+        user_id,
+        role_details:organization_roles ( org_role_id, role_name )
+      `)
+      .eq("org_id", orgId);
+
+    if (error) {
+      console.error(`[service] Error fetching members for organization ${orgId}:`, error);
+      throw new AppError("Failed to retrieve organization members.", 500, error);
+    }
+    
+    if (!data) {
+      console.warn("[service] No data returned from organization members query for orgId:", orgId);
+      return [];
+    }
+    
+
+    return data.map((member, index) => {
+      let roleInfo = null;
+      const rawRoleData = member.role_details;
+
+      // Defensive check based on persistent linter feedback about arrays
+      if (Array.isArray(rawRoleData) && rawRoleData.length > 0) {
+        roleInfo = rawRoleData[0] as { org_role_id: string; role_name: string };
+      } else if (typeof rawRoleData === 'object' && rawRoleData !== null && !Array.isArray(rawRoleData)) {
+        // If it's an object (which schema implies for to-one)
+        roleInfo = rawRoleData as { org_role_id: string; role_name: string };
+      }
+
+      if (!roleInfo) {
+          console.warn(`[service] Member at index ${index} (user_id: ${member.user_id}) has no parsable role_details. Raw role_details:`, JSON.stringify(rawRoleData, null, 2));
+      }
+      
+      return {
+        userId: member.user_id,
+        email: null, 
+        roleId: roleInfo?.org_role_id,
+        roleName: roleInfo?.role_name,
+      };
+    });
+  }
 }; // End of organizationService 
