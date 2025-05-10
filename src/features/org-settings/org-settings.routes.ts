@@ -9,6 +9,11 @@ import { validate } from "../../lib/validation";
 import { AppError } from "../../lib/errors";
 import type { Request, Response, NextFunction } from "express";
 import { authenticate, type AuthenticatedRequest } from "../../lib/auth.middleware";
+import {
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
+} from "../../lib/membership.middleware";
+import { checkPermission } from "../../lib/permission.middleware";
 
 // Create router with mergeParams enabled
 const router = express.Router({ mergeParams: true });
@@ -78,6 +83,9 @@ router.get(
     "/",
     authenticate,
     validate.params(orgHandleParamSchema),
+    setOrgIdFromRequest,
+    checkOrganizationMembership,
+    checkPermission("org:read"),
     handleErrors(async (req: AuthenticatedRequest, res: Response) => {
         const settings = await orgSettingsService.getOrgSettings(req.params.org_handle!); // Added non-null assertion
         res.json(settings);
