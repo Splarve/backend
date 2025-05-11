@@ -30,48 +30,43 @@ const router = express.Router();
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/CreateOrganizationInput' 
- *             # Ensure CreateOrganizationInput is defined in your OpenAPI spec components
  *     responses:
  *       201:
  *         description: Organization created successfully
- *         content:
- *           application/json:
- *             schema:
- *               # Define your success response schema here, e.g., the created organization object
- *               type: object 
- *               properties:
- *                 org_id: 
- *                   type: string
- *                   format: uuid
- *                 # ... other organization properties
  *       400:
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
  *       409:
- *         description: Conflict (e.g., organization handle already exists)
+ *         description: Conflict
  *       500:
  *         description: Internal server error
  */
 router.post(
   "/",
-  authenticate, // Middleware to check JWT and get user
-  validate.body(createOrganizationSchema), // Middleware to validate request body
+  authenticate, // Middleware now provides full user object on req.user
+  validate.body(createOrganizationSchema), 
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      if (!req.user || !req.user.id) {
-        // This should ideally be caught by authenticate middleware, but as a safeguard:
-        return next(new AppError("Authentication error: User ID not found.", 401));
+      // req.user should now contain id, email, and user_metadata from the updated authenticate middleware
+      if (!req.user || !req.user.id || !req.user.user_metadata) { 
+        // Added check for user_metadata for robustness, though email can be null
+        console.error("[OrgCreationRoute] User object or essential fields (id, user_metadata) missing after authentication.", req.user);
+        return next(new AppError("Authentication error: User details incomplete.", 401));
       }
-      const creatorUserId = req.user.id;
+
+      const creator = {
+        id: req.user.id,
+        email: req.user.email, 
+        user_metadata: req.user.user_metadata
+      };
+
       const organization = await organizationService.createOrganization(
-        req.body, // Validated by the 'validate' middleware
-        creatorUserId
+        req.body, 
+        creator
       );
       res.status(201).json(organization);
     } catch (error) {
-      // Catch errors from the service (like AppError for unique handle conflict)
-      // or unexpected errors and pass to global error handler.
       next(error);
     }
   }
@@ -616,6 +611,12 @@ router.get(
  *                   email:
  *                     type: string
  *                     format: email
+ *                   displayName:
+ *                     type: string
+ *                     description: The display name of the member.
+ *                   last_active_status:
+ *                     type: string
+ *                     description: The last active status/date of the member (e.g., YYYY-MM-DD).
  *                   roleId:
  *                     type: string
  *                     format: uuid
@@ -624,6 +625,8 @@ router.get(
  *                 example:
  *                   - userId: "123e4567-e89b-12d3-a456-426614174000"
  *                     email: "member1@example.com"
+ *                     displayName: "Member One"
+ *                     last_active_status: "10/26/2023"
  *                     roleId: "abcdef01-e89b-12d3-a456-426614174000"
  *                     roleName: "Editor"
  *       401:

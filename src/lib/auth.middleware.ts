@@ -8,6 +8,7 @@ export interface AuthenticatedRequest extends Request {
     // Add other user properties you might need from Supabase user object
     aud?: string;
     email?: string;
+    user_metadata?: { [key: string]: any; display_name?: string };
     // ... any other fields from supabase.auth.User
   };
 }
@@ -51,7 +52,7 @@ export const authenticate = async (
         id: data.user.id, 
         aud: data.user.aud,
         email: data.user.email,
-        // ... map other necessary fields from data.user
+        user_metadata: data.user.user_metadata
     }; 
     next();
   } catch (err) {

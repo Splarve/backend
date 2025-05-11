@@ -11,8 +11,26 @@ const INVITATION_EXPIRY_HOURS = 72; // Invitations expire in 3 days
 export const organizationService = {
   async createOrganization(
     input: CreateOrganizationInput,
-    creatorUserId: string
+    creator: { 
+      id: string; 
+      email?: string | null; // Make email optional as it might not always be present
+      user_metadata?: { [key: string]: any; display_name?: string } | null; // Standard Supabase user_metadata structure
+    }
   ) {
+    // Step 0: Use provided creator's auth details
+    const creatorUserId = creator.id;
+    const creatorEmail = creator.email || null;
+    // Attempt to get display_name from user_metadata, fallback to a generic name or part of email if not present
+    const creatorDisplayName = creator.user_metadata?.display_name || 
+                             (creatorEmail ? creatorEmail.split('@')[0] : null) || 
+                             'Creator'; // Fallback display name
+
+    console.log(`[OrgCreation] Creating organization with Creator ID: ${creatorUserId}, Email: ${creatorEmail}, DisplayName: ${creatorDisplayName}`);
+    if (!creator.user_metadata?.display_name) {
+        console.warn("[OrgCreation] display_name not found in creator.user_metadata. Fallback logic for display name was triggered.");
+        console.log("[OrgCreation] creator.user_metadata snapshot:", JSON.stringify(creator.user_metadata, null, 2));
+    }
+
     // Start a Supabase transaction
     // Note: Actual transaction support for multiple operations might depend on Supabase client library version
     // or require manually calling RPC functions that bundle these operations if direct JS transactions are limited.
@@ -151,15 +169,17 @@ export const organizationService = {
     
 
     // Step 4: Assign the creator as the Owner of the new organization
-    const { error: memberAssignError } = await supabase // Renamed memberError to avoid conflict
+    const { error: memberAssignError } = await supabase
       .from("organization_members")
       .insert({
         org_id: newOrgId,
         user_id: creatorUserId,
         org_role_id: ownerRoleId, // Assign the Owner role ID
+        email: creatorEmail, // Use the provided email
+        display_name: creatorDisplayName, // Use the provided or derived display name
       });
 
-    if (memberAssignError) { // Use new variable name
+    if (memberAssignError) {
       console.error("Error assigning creator to organization:", memberAssignError);
       throw new AppError(
         "Failed to assign creator as organization owner",
@@ -352,7 +372,52 @@ export const organizationService = {
             .from("organization_invitations")
             .update({ status: "accepted" }) // Or a custom status like 'already_member'
             .eq("invitation_id", invitation.invitation_id);
-        throw new AppError("You are already a member of this organization.", 409);
+
+        // Step 4.5: Fetch accepting user's auth details for display_name
+        const { data: acceptingUserAuthData, error: acceptingUserAuthError } = await supabase
+          .schema("auth")
+          .from("users")
+          .select("raw_user_meta_data") // We already have email via acceptingUserEmail
+          .eq("id", acceptingUserId)
+          .single();
+
+        if (acceptingUserAuthError || !acceptingUserAuthData) {
+          console.error("Error fetching accepting user auth details for display_name:", acceptingUserAuthError);
+          // If this fails, we might still proceed but log it, or throw. For now, let's throw.
+          throw new AppError(
+            "Failed to fetch user details for joining organization.",
+            500,
+            acceptingUserAuthError || undefined
+          );
+        }
+        const userDisplayName = acceptingUserAuthData.raw_user_meta_data?.display_name || acceptingUserEmail.split('@')[0] || 'Member';
+
+        // Step 5: Update the existing member's details in organization_members
+        const { error: updateMemberError } = await supabase
+          .from("organization_members")
+          .update({ 
+            email: acceptingUserEmail, 
+            display_name: userDisplayName,
+            // org_role_id: invitation.role_to_assign_id, // Decide if role should be updated. If so, uncomment.
+                                                          // If the invitation implies a new role even for an existing member,
+                                                          // this should be included. Otherwise, leave it to not change current role.
+          })
+          .eq("org_id", invitation.org_id)
+          .eq("user_id", acceptingUserId);
+
+        if (updateMemberError) {
+          console.error("Error updating user details in organization_members:", updateMemberError);
+          // Log this as a potential data consistency issue. 
+          // The main operation (accepting invite) for an existing member still proceeds.
+          // Not throwing an error here not to break the flow for the user.
+        }
+
+        return {
+          message: "Invitation accepted successfully!",
+          organization_id: invitation.org_id,
+          organization_handle: invitation.organizations?.org_handle, // if joined in select
+          role_assigned_id: invitation.role_to_assign_id,
+        };
     }
 
     // Step 5: Add user to organization_members (Transaction recommended for these two updates)
@@ -820,6 +885,8 @@ export const organizationService = {
       .from("organization_members")
       .select(`
         user_id,
+        email,
+        display_name,
         role_details:organization_roles ( org_role_id, role_name )
       `)
       .eq("org_id", orgId);
@@ -834,28 +901,26 @@ export const organizationService = {
       return [];
     }
     
-
     return data.map((member, index) => {
       let roleInfo = null;
       const rawRoleData = member.role_details;
 
-      // Defensive check based on persistent linter feedback about arrays
       if (Array.isArray(rawRoleData) && rawRoleData.length > 0) {
         roleInfo = rawRoleData[0] as { org_role_id: string; role_name: string };
       } else if (typeof rawRoleData === 'object' && rawRoleData !== null && !Array.isArray(rawRoleData)) {
-        // If it's an object (which schema implies for to-one)
         roleInfo = rawRoleData as { org_role_id: string; role_name: string };
       }
 
-      if (!roleInfo) {
-          console.warn(`[service] Member at index ${index} (user_id: ${member.user_id}) has no parsable role_details. Raw role_details:`, JSON.stringify(rawRoleData, null, 2));
+      if (!roleInfo && member.role_details) {
+          console.warn(`[service] Member at index ${index} (user_id: ${member.user_id}) has unparsable role_details. Raw:`, JSON.stringify(rawRoleData));
       }
       
       return {
         userId: member.user_id,
-        email: null, 
-        roleId: roleInfo?.org_role_id,
-        roleName: roleInfo?.role_name,
+        email: member.email || 'N/A',
+        displayName: member.display_name || member.email?.split('@')[0] || 'Anonymous',
+        roleId: roleInfo?.org_role_id || 'N/A',
+        roleName: roleInfo?.role_name || 'N/A',
       };
     });
   }
