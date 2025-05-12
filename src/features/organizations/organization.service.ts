@@ -217,55 +217,33 @@ export const organizationService = {
       throw new AppError("Specified role not found for this organization.", 400);
     }
 
-    // Step 2a: Check if the invited_email corresponds to an existing user in auth.users
-    // and if so, if they are already an active member of this organization.
-    let foundAuthUserId: string | null = null;
-    const lowercasedInvitedEmail = inviteInput.invited_email.toLowerCase();
+    const invitedEmail = inviteInput.invited_email; // No longer lowercasing
 
-    // Query auth.users table directly using the service role client
-    const { data: existingUser, error: userQueryError } = await supabase
-      .from("users") // This targets the auth.users table
-      .select("id")
-      .eq("email", lowercasedInvitedEmail)
-      .maybeSingle(); // Returns one row or null, doesn't error if not found
+    // Step 1.5: Check if this email is ALREADY an active member of THIS organization
+    const { count: activeMemberCount, error: activeMemberCheckError } = await supabase
+      .from("organization_members")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("email", invitedEmail); // Case-sensitive check
 
-    if (userQueryError) {
-      // Log the error but don't necessarily throw if it's just about not finding the user
-      // unless it's an actual unexpected database error.
-      // This check might need refinement based on how critical an actual DB error is here vs. user not found.
-      console.error("Error querying auth.users by email:", userQueryError);
-      throw new AppError("Failed to verify invited user details due to a database error.", 500, userQueryError);
+    if (activeMemberCheckError) {
+      console.error("Error checking active membership by email:", activeMemberCheckError);
+      throw new AppError("Failed to verify existing membership by email.", 500, activeMemberCheckError);
     }
 
-    if (existingUser && existingUser.id) {
-      foundAuthUserId = existingUser.id;
-      // User exists in Supabase Auth, now check if they are already a member of this organization
-      const { count: memberCount, error: memberCheckError } = await supabase
-        .from("organization_members")
-        .select("*", { count: "exact", head: true })
-        .eq("org_id", orgId)
-        .eq("user_id", foundAuthUserId);
-
-      if (memberCheckError) {
-        console.error("Error checking active membership for existing user:", memberCheckError);
-        throw new AppError("Failed to verify existing membership.", 500, memberCheckError);
-      }
-
-      if (memberCount && memberCount > 0) {
-        throw new AppError(
-          `${inviteInput.invited_email} is already an active member of this organization.`,
-          409 // Conflict
-        );
-      }
+    if (activeMemberCount && activeMemberCount > 0) {
+      throw new AppError(
+        `${invitedEmail} is already an active member of this organization. No new invitation needed.`,
+        409 // Conflict
+      );
     }
-    // If user not found in auth, or found but not a member, proceed to check pending invites.
 
-    // Step 2b: Check for existing PENDING invitations for this email in this org
+    // Step 2: Check for existing PENDING invitations for this email in this org
     const { count: existingInviteCount, error: inviteCheckError } = await supabase
       .from("organization_invitations")
       .select("*", { count: "exact", head: true })
       .eq("org_id", orgId)
-      .eq("invited_email", lowercasedInvitedEmail) 
+      .eq("invited_email", invitedEmail) // Case-sensitive check
       .eq("status", "pending");
     
     if (inviteCheckError) {
@@ -275,7 +253,7 @@ export const organizationService = {
 
     if (existingInviteCount && existingInviteCount > 0) {
       throw new AppError(
-        `An active invitation already exists for ${lowercasedInvitedEmail} for this organization.`,
+        `An active invitation already exists for ${invitedEmail} for this organization.`,
         409
       );
     }
@@ -290,7 +268,7 @@ export const organizationService = {
       .from("organization_invitations")
       .insert({
         org_id: orgId,
-        invited_email: lowercasedInvitedEmail, // Store email in lowercase
+        invited_email: invitedEmail, // Store email as provided (case-sensitive)
         invited_by_user_id: inviterUserId,
         role_to_assign_id: inviteInput.org_role_id,
         token: token,
@@ -342,15 +320,10 @@ export const organizationService = {
       throw new AppError("Invitation token has expired.", 410); // Gone
     }
 
-    // Step 3: Verify the accepting user is the one invited
-    // The acceptingUserId comes from the JWT of the logged-in user.
-    // The invitation.invited_email is the email that was invited.
-    // If the invited_email doesn't match the logged-in user's email, it could be:
-    //   a) An attempt to hijack an invite (if the logged-in user isn't the intended recipient).
-    //   b) The invited_email is for a new user who just signed up with that email.
-    if (invitation.invited_email.toLowerCase() !== acceptingUserEmail.toLowerCase()) {
+    // Step 3: Verify the accepting user is the one invited (case-sensitive)
+    if (invitation.invited_email !== acceptingUserEmail) { // Strict case-sensitive comparison
       throw new AppError(
-        "Email mismatch: This invitation is intended for a different email address.",
+        "Email mismatch: This invitation is intended for a different email address (case-sensitive).",
         403
       );
     }
@@ -495,10 +468,10 @@ export const organizationService = {
       throw new AppError("Invitation token has expired. Cannot decline.", 410);
     }
 
-    // Step 3: Verify the declining user is the one invited
-    if (invitation.invited_email.toLowerCase() !== decliningUserEmail.toLowerCase()) {
+    // Step 3: Verify the declining user is the one invited (case-sensitive)
+    if (invitation.invited_email !== decliningUserEmail) { // Strict case-sensitive comparison
       throw new AppError(
-        "Email mismatch: This invitation is intended for a different email address.",
+        "Email mismatch: This invitation is intended for a different email address (case-sensitive).",
         403
       );
     }

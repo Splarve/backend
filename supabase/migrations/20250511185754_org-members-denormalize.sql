@@ -3,6 +3,11 @@ ALTER TABLE public.organization_members
 ADD COLUMN email TEXT,
 ADD COLUMN display_name TEXT;
 
+-- Add a composite unique constraint on org_id and email
+-- This ensures an email can only appear once per organization.
+ALTER TABLE public.organization_members
+ADD CONSTRAINT unique_org_email UNIQUE (org_id, email);
+
 -- Optional: Add an index on user_id in organization_members if not already present and frequently queried
 -- CREATE INDEX IF NOT EXISTS idx_organization_members_user_id ON public.organization_members(user_id);
 
