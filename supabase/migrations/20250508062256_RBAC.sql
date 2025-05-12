@@ -70,14 +70,21 @@ CREATE TABLE public.organization_members (
     org_id UUID NOT NULL REFERENCES public.organizations(org_id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     org_role_id UUID NOT NULL REFERENCES public.organization_roles(org_role_id) ON DELETE CASCADE,
+    email TEXT,
+    display_name TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    UNIQUE(org_id, user_id) -- A user can only have one role assignment per organization
+    UNIQUE(org_id, user_id), -- A user can only have one role assignment per organization
+    CONSTRAINT unique_org_email UNIQUE (org_id, email) -- Ensures an email can only appear once per organization
 );
 
 CREATE INDEX idx_organization_members_org_id_user_id ON public.organization_members(org_id, user_id);
 CREATE INDEX idx_organization_members_role_id ON public.organization_members(org_role_id);
+
+-- Comments for denormalized columns
+COMMENT ON COLUMN public.organization_members.email IS 'Denormalized email from auth.users.';
+COMMENT ON COLUMN public.organization_members.display_name IS 'Denormalized display name from auth.users (raw_user_meta_data).';
 
 -- Trigger for updated_at on organization_members
 CREATE OR REPLACE FUNCTION update_organization_members_updated_at_column()
