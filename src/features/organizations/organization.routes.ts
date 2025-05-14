@@ -6,6 +6,8 @@ import { createOrganizationSchema, orgHandleParamSchema, inviteUserSchema, accep
 import { organizationService } from "./organization.service";
 import { AppError } from "../../lib/errors";
 import { checkPermission, setOrgIdFromHandle } from "../../lib/permission.middleware"; // Import permission middlewares
+import { z } from "zod";
+import { createRoleSchema, updateRoleSchema } from "./organization.validation";
 
 const router = express.Router();
 
@@ -121,7 +123,7 @@ router.post(
   validate.params(orgHandleParamSchema), // 2. Validate org_handle from path params *first*
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // 3. Custom middleware to set org_id
     // At this point, req.params.org_handle is validated and should be a string
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string); // Cast to string for safety, though validation should ensure it
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? ''); // Cast to string for safety, though validation should ensure it
   },
   checkPermission("members:invite"),    // 4. Check if inviter has permission (needs req.org_id)
   validate.body(inviteUserSchema),      // 5. Validate invitation payload
@@ -186,7 +188,7 @@ router.post(
   "/:org_handle/roles",
   authenticate,
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
   validate.params(orgHandleParamSchema), // Validate org_handle
   checkPermission("roles:create"),      // Check permission to create roles
@@ -202,7 +204,8 @@ router.post(
       
       const newRole = await organizationService.createOrganizationRole(
         req.org_id, 
-        req.body 
+        req.body.role_name,
+        req.body.permission_ids
       );
       res.status(201).json(newRole);
     } catch (error) {
@@ -248,21 +251,17 @@ router.post(
 router.get(
   "/:org_handle/roles",
   authenticate,
-  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
-  validate.params(orgHandleParamSchema), // Validate org_handle
-  checkPermission("members:read"),      // Check permission (e.g., members:read or a new roles:read)
+  validate.params(orgHandleParamSchema),
+  checkPermission("roles:read"),
   async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
     try {
-      if (!req.user || !req.user.id) { 
-        return next(new AppError("Authentication error: User ID not found.", 401));
-      }
-      if (!req.org_id) { 
+      if (!req.org_id) {
         return next(new AppError("Organization ID not found on request.", 500));
       }
-      
-      const roles = await organizationService.listOrganizationRoles(req.org_id); 
+      const roles = await organizationService.getOrganizationRoles(req.org_id);
       res.status(200).json(roles);
     } catch (error) {
       next(error);
@@ -320,34 +319,24 @@ router.get(
 router.put(
   "/:org_handle/roles/:org_role_id",
   authenticate,
-  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
-  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)), // Validate both params
-  checkPermission("roles:edit"),      // Check permission to edit roles
-  validate.body(updateOrgRoleSchema),   // Validate role update payload
+  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)),
+  checkPermission("roles:edit"),
+  validate.body(updateOrgRoleSchema),
   async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
     try {
-      if (!req.user || !req.user.id) { 
-        return next(new AppError("Authentication error: User ID not found.", 401));
-      }
-      if (!req.org_id) { 
+      if (!req.org_id) {
         return next(new AppError("Organization ID not found on request.", 500));
       }
-      const { org_role_id } = req.params; // Already validated by validate.params
-
-      // Add assertion or check
-      if (!org_role_id) {
-        // This should technically be caught by validate.params, but belts and braces for TS
-        return next(new AppError("Role ID is required in path.", 400));
-      }
-      
-      const updatedRole = await organizationService.updateOrganizationRole(
-        req.org_id, 
-        org_role_id, // Now guaranteed to be string by the check above
-        req.body 
+      const role = await organizationService.updateOrganizationRole(
+        req.org_id,
+        req.params.org_role_id as string,
+        req.body.role_name,
+        req.body.permission_ids
       );
-      res.status(200).json(updatedRole);
+      res.json(role);
     } catch (error) {
       next(error);
     }
@@ -402,29 +391,18 @@ router.put(
 router.delete(
   "/:org_handle/roles/:org_role_id",
   authenticate,
-  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
-  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)), // Validate both params
-  checkPermission("roles:delete"),      // Check permission to delete roles
+  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)),
+  checkPermission("roles:delete"),
   async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
     try {
-      if (!req.user || !req.user.id) { 
-        return next(new AppError("Authentication error: User ID not found.", 401));
-      }
-      if (!req.org_id) { 
+      if (!req.org_id) {
         return next(new AppError("Organization ID not found on request.", 500));
       }
-      const { org_role_id } = req.params; 
-      if (!org_role_id) {
-        return next(new AppError("Role ID is required in path.", 400));
-      }
-      
-      const result = await organizationService.deleteOrganizationRole(
-        req.org_id, 
-        org_role_id
-      );
-      res.status(200).json(result);
+      await organizationService.deleteOrganizationRole(req.org_id, req.params.org_role_id as string);
+      res.status(204).send();
     } catch (error) {
       next(error);
     }
@@ -482,7 +460,7 @@ router.put(
   "/:org_handle/members/:member_user_id/role",
   authenticate,
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
   validate.params(orgHandleParamSchema.merge(memberUserIdParamSchema)), // Validate path params
   checkPermission("roles:assign"),    // Check permission to assign roles
@@ -556,7 +534,7 @@ router.get(
   authenticate, // Ensure user is logged in
   validate.params(orgHandleParamSchema), // Validate the org_handle
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
   // No specific checkPermission here, as we are GETTING permissions, not acting on one.
   // The service layer will correctly return empty if user is not a member.
@@ -643,7 +621,7 @@ router.get(
   authenticate,                         
   validate.params(orgHandleParamSchema), 
   (req: AuthenticatedRequest, res: Response, next: NextFunction) => { 
-    setOrgIdFromHandle(req, res, next, req.params.org_handle as string);
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
   },
   checkPermission("members:read"),    
   async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
@@ -833,3 +811,78 @@ appPermissionsRouter.get(
 // or export it separately.
 // For now, assuming organizationRouter is the main export from this file.
 export { router as organizationRouter, invitationActionsRouter, appPermissionsRouter }; 
+
+// Role management routes
+router.post(
+  "/:org_handle/roles",
+  authenticate,
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
+  },
+  validate.params(orgHandleParamSchema),
+  checkPermission("roles:create"),
+  validate.body(createRoleSchema),
+  async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
+    try {
+      if (!req.org_id) {
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+      const role = await organizationService.createOrganizationRole(
+        req.org_id,
+        req.body.role_name,
+        req.body.permissions
+      );
+      res.status(201).json(role);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.put(
+  "/:org_handle/roles/:org_role_id",
+  authenticate,
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
+  },
+  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)),
+  checkPermission("roles:edit"),
+  validate.body(updateRoleSchema),
+  async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
+    try {
+      if (!req.org_id) {
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+      const role = await organizationService.updateOrganizationRole(
+        req.org_id,
+        req.params.org_role_id as string,
+        req.body.role_name,
+        req.body.permission_ids
+      );
+      res.json(role);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+router.delete(
+  "/:org_handle/roles/:org_role_id",
+  authenticate,
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
+  },
+  validate.params(orgHandleParamSchema.merge(orgRoleIdParamSchema)),
+  checkPermission("roles:delete"),
+  async (req: AuthenticatedRequest & { org_id?: string }, res: Response, next: NextFunction) => {
+    try {
+      if (!req.org_id) {
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+      await organizationService.deleteOrganizationRole(req.org_id, req.params.org_role_id as string);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+); 

@@ -126,4 +126,24 @@ export const memberUserIdParamSchema = z.object({
   member_user_id: z.string().uuid("Invalid User ID format in path.")
 });
 
-export type MemberUserIdParams = z.infer<typeof memberUserIdParamSchema>; 
+export type MemberUserIdParams = z.infer<typeof memberUserIdParamSchema>;
+
+// Role validation schemas
+export const createRoleSchema = z.object({
+  role_name: z.string()
+    .min(2, "Role name must be at least 2 characters")
+    .max(50, "Role name must not exceed 50 characters")
+    .regex(/^[a-zA-Z0-9\s-_]+$/, "Role name can only contain letters, numbers, spaces, hyphens, and underscores"),
+  permissions: z.array(z.string())
+    .min(1, "At least one permission must be specified")
+    .refine((perms) => perms.every(perm => perm.startsWith('org:') || perm.startsWith('members:') || perm.startsWith('roles:')), 
+      "Invalid permission format. Permissions must start with 'org:', 'members:', or 'roles:'")
+});
+
+export const updateRoleSchema = createRoleSchema.extend({
+  org_role_id: z.string().uuid("Invalid role ID format")
+});
+
+export const deleteRoleSchema = z.object({
+  org_role_id: z.string().uuid("Invalid role ID format")
+}); 

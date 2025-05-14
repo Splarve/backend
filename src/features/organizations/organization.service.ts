@@ -8,6 +8,15 @@ const DEFAULT_ORG_ADMIN_ROLE_NAME = "Owner";
 const DEFAULT_ORG_MEMBER_ROLE_NAME = "Member"; // New default role
 const INVITATION_EXPIRY_HOURS = 72; // Invitations expire in 3 days
 
+interface OrganizationRole {
+  org_role_id: string;
+  role_name: string;
+  is_system_role: boolean;
+  permissions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export const organizationService = {
   async createOrganization(
     input: CreateOrganizationInput,
@@ -502,87 +511,8 @@ export const organizationService = {
     return data || [];
   },
 
-  async createOrganizationRole(orgId: string, input: CreateOrgRoleInput) {
-    // Step 1: Validate that all provided permission_ids exist in app_permissions
-    if (input.permission_ids && input.permission_ids.length > 0) {
-      const { data: existingPermissions, error: permCheckError } = await supabase
-        .from("app_permissions")
-        .select("permission_id")
-        .in("permission_id", input.permission_ids);
-
-      if (permCheckError) {
-        console.error("Error validating permission IDs:", permCheckError);
-        throw new AppError("Failed to validate permissions.", 500, permCheckError);
-      }
-      if (existingPermissions.length !== input.permission_ids.length) {
-        const foundIds = existingPermissions.map(p => p.permission_id);
-        const notFoundIds = input.permission_ids.filter(id => !foundIds.includes(id));
-        throw new AppError(`Invalid permission IDs provided: ${notFoundIds.join(", ")}.`, 400);
-      }
-    }
-
-    // Step 2: Create the role in organization_roles (transaction recommended)
-    let newRoleData: { org_role_id: string; role_name: string; created_at: string; } | undefined;
-    try {
-      const { data: roleData, error: roleError } = await supabase
-        .from("organization_roles")
-        .insert({
-          org_id: orgId,
-          role_name: input.role_name,
-          // description: input.description, // Add if description is in your table schema for organization_roles
-          is_system_role: false, // Custom roles are not system roles
-        })
-        .select("org_role_id, role_name, created_at")
-        .single();
-
-      if (roleError) {
-        if (roleError.code === '23505') { // Unique constraint violation (org_id, role_name)
-            throw new AppError(`Role name '${input.role_name}' already exists in this organization.`, 409);
-        }
-        console.error("Error creating organization role:", roleError);
-        throw new AppError("Failed to create role.", 500, roleError);
-      }
-      if (!roleData) {
-        throw new AppError("Failed to create role, no data returned.", 500);
-      }
-      newRoleData = roleData;
-
-      // Step 3: Assign permissions to the new role in organization_role_permissions
-      if (input.permission_ids && input.permission_ids.length > 0 && newRoleData) {
-        const rolePermissionsToInsert = input.permission_ids.map((permissionId) => ({
-          org_role_id: newRoleData!.org_role_id,
-          permission_id: permissionId,
-        }));
-
-        const { error: assignPermError } = await supabase
-          .from("organization_role_permissions")
-          .insert(rolePermissionsToInsert);
-
-        if (assignPermError) {
-          console.error("Error assigning permissions to new role:", assignPermError);
-          // IMPORTANT: Rollback role creation here if in a transaction
-          throw new AppError("Role created, but failed to assign permissions.", 500, assignPermError);
-        }
-      }
-    } catch (error) {
-        // If any part of the transaction fails, rethrow
-        // Ideally, a real DB transaction would handle rollback.
-        throw error;
-    }
-
-    if (!newRoleData) {
-        throw new AppError("Role data was not properly finalized.", 500);
-    }
-
-    return {
-        ...newRoleData,
-        assigned_permissions: input.permission_ids || [] 
-        // description: input.description // include if added to select/return
-    };
-  },
-
-  async listOrganizationRoles(orgId: string) {
-    const { data: roles, error } = await supabase
+  async getOrganizationRoles(orgId: string): Promise<OrganizationRole[]> {
+    const { data: roles, error: rolesError } = await supabase
       .from("organization_roles")
       .select(`
         org_role_id,
@@ -590,188 +520,193 @@ export const organizationService = {
         is_system_role,
         created_at,
         updated_at,
-        organization_role_permissions ( permission_id )
+        organization_role_permissions (
+          permission_id
+        )
       `)
-      .eq("org_id", orgId);
+      .eq("org_id", orgId)
+      .order("created_at", { ascending: true });
 
-    if (error) {
-      console.error(`Error fetching roles for organization ${orgId}:`, error);
-      throw new AppError("Failed to retrieve organization roles.", 500, error || undefined);
+    if (rolesError) {
+      console.error("Error fetching organization roles:", rolesError);
+      throw new AppError("Failed to fetch organization roles.", 500, rolesError);
     }
 
-    return (roles || []).map(role => ({
-        ...role,
-        // Simplify the permissions structure if needed, e.g., just an array of permission_ids
-        permissions: role.organization_role_permissions.map((p: any) => p.permission_id)
+    return roles.map(role => ({
+      org_role_id: role.org_role_id,
+      role_name: role.role_name,
+      is_system_role: role.is_system_role,
+      permissions: role.organization_role_permissions.map(p => p.permission_id),
+      created_at: role.created_at,
+      updated_at: role.updated_at
     }));
   },
 
-  async updateOrganizationRole(orgId: string, orgRoleId: string, input: UpdateOrgRoleInput) {
-    // Step 0: Fetch the role to ensure it belongs to the org and is not a system role if trying to change crucial aspects
-    const { data: existingRole, error: fetchRoleError } = await supabase
+  async createOrganizationRole(
+    orgId: string,
+    roleName: string,
+    permission_ids: string[]
+  ): Promise<OrganizationRole> {
+    // Start a transaction
+    const { data: role, error: roleError } = await supabase
       .from("organization_roles")
-      .select("org_role_id, is_system_role, role_name")
-      .eq("org_id", orgId)
-      .eq("org_role_id", orgRoleId)
+      .insert({
+        org_id: orgId,
+        role_name: roleName,
+        is_system_role: false
+      })
+      .select()
       .single();
 
-    if (fetchRoleError || !existingRole) {
-      throw new AppError("Role not found in this organization.", 404, fetchRoleError || undefined);
+    if (roleError) {
+      console.error("Error creating organization role:", roleError);
+      throw new AppError("Failed to create organization role.", 500, roleError);
     }
 
-    // Prevent renaming system roles or changing their fundamental nature if needed.
-    // For now, we allow changing description and permissions of system roles if input allows.
-    if (existingRole.is_system_role && input.role_name && input.role_name !== existingRole.role_name) {
-        throw new AppError("System role names cannot be changed.", 400);
-    }
+    // Insert role permissions
+    const rolePermissions = permission_ids.map(permissionId => ({
+      org_role_id: role.org_role_id,
+      permission_id: permissionId
+    }));
 
-    // Step 1: Validate new permission_ids if provided
-    if (input.permission_ids) { // This covers empty array too (for removing all permissions)
-      if (input.permission_ids.length > 0) {
-        const { data: existingPermissions, error: permCheckError } = await supabase
-          .from("app_permissions")
-          .select("permission_id")
-          .in("permission_id", input.permission_ids);
+    const { error: permissionsError } = await supabase
+      .from("organization_role_permissions")
+      .insert(rolePermissions);
 
-        if (permCheckError) {
-          console.error("Error validating permission IDs for update:", permCheckError);
-          throw new AppError("Failed to validate permissions for update.", 500, permCheckError);
-        }
-        if (existingPermissions.length !== input.permission_ids.length) {
-          const foundIds = existingPermissions.map(p => p.permission_id);
-          const notFoundIds = input.permission_ids.filter(id => !foundIds.includes(id));
-          throw new AppError(`Invalid permission IDs provided for update: ${notFoundIds.join(", ")}.`, 400);
-        }
-      }
-    }
-
-    // Step 2: Update role details (name, description) in organization_roles
-    // This needs to be in a transaction with permission changes
-    const roleUpdatePayload: { role_name?: string; description?: string | null } = {};
-    if (input.role_name !== undefined) {
-      roleUpdatePayload.role_name = input.role_name;
-    }
-    if (input.description !== undefined) { // Allows setting description to null or a new string
-      roleUpdatePayload.description = input.description;
-    }
-
-    if (Object.keys(roleUpdatePayload).length > 0) {
-      const { error: updateRoleDetailsError } = await supabase
+    if (permissionsError) {
+      console.error("Error assigning permissions to role:", permissionsError);
+      // Attempt to clean up the created role
+      await supabase
         .from("organization_roles")
-        .update(roleUpdatePayload)
-        .eq("org_role_id", orgRoleId);
-
-      if (updateRoleDetailsError) {
-        if (updateRoleDetailsError.code === '23505') { // Unique constraint (org_id, role_name)
-            throw new AppError(`Role name '${input.role_name}' already exists in this organization.`, 409);
-        }
-        console.error("Error updating role details:", updateRoleDetailsError);
-        throw new AppError("Failed to update role details.", 500, updateRoleDetailsError);
-      }
-    }
-
-    // Step 3: Update permissions if permission_ids are provided in the input
-    // This means replacing all existing permissions for the role with the new set.
-    if (input.permission_ids !== undefined) {
-      // Delete existing permissions for this role
-      const { error: deletePermsError } = await supabase
-        .from("organization_role_permissions")
         .delete()
-        .eq("org_role_id", orgRoleId);
-
-      if (deletePermsError) {
-        console.error("Error deleting old permissions for role update:", deletePermsError);
-        throw new AppError("Failed to update role permissions (cleanup failed).", 500, deletePermsError);
-      }
-
-      // Insert new permissions if any
-      if (input.permission_ids.length > 0) {
-        const newRolePermissionsToInsert = input.permission_ids.map((permissionId) => ({
-          org_role_id: orgRoleId,
-          permission_id: permissionId,
-        }));
-
-        const { error: assignNewPermsError } = await supabase
-          .from("organization_role_permissions")
-          .insert(newRolePermissionsToInsert);
-
-        if (assignNewPermsError) {
-          console.error("Error assigning new permissions for role update:", assignNewPermsError);
-          // Data inconsistency: role details might be updated, but permissions failed.
-          // Transaction essential here.
-          throw new AppError("Failed to assign new permissions to role.", 500, assignNewPermsError);
-        }
-      }
+        .eq("org_role_id", role.org_role_id);
+      throw new AppError("Failed to assign permissions to role.", 500, permissionsError);
     }
 
-    // Refetch the updated role to return it
-    const { data: updatedRoleData, error: refetchError } = await supabase
-      .from("organization_roles")
-      .select(`org_role_id, role_name, is_system_role, created_at, updated_at, organization_role_permissions ( permission_id )`)
-      .eq("org_role_id", orgRoleId)
-      .single();
-
-    if (refetchError || !updatedRoleData) {
-        console.error("Failed to refetch updated role:", refetchError);
-        throw new AppError("Role updated, but failed to retrieve latest state.", 500, refetchError || undefined);
-    }
-    
     return {
-        ...updatedRoleData,
-        permissions: updatedRoleData.organization_role_permissions.map((p: any) => p.permission_id)
+      org_role_id: role.org_role_id,
+      role_name: role.role_name,
+      is_system_role: role.is_system_role,
+      permissions: permission_ids,
+      created_at: role.created_at,
+      updated_at: role.updated_at
     };
   },
 
-  async deleteOrganizationRole(orgId: string, orgRoleId: string) {
-    // Step 1: Fetch the role to ensure it belongs to the org and is not a system role
-    const { data: existingRole, error: fetchRoleError } = await supabase
+  async updateOrganizationRole(
+    orgId: string,
+    roleId: string,
+    roleName: string,
+    permission_ids: string[]
+  ): Promise<OrganizationRole> {
+    // Check if role exists and belongs to the organization
+    const { data: existingRole, error: checkError } = await supabase
       .from("organization_roles")
-      .select("org_role_id, is_system_role, role_name")
+      .select("is_system_role")
       .eq("org_id", orgId)
-      .eq("org_role_id", orgRoleId)
+      .eq("org_role_id", roleId)
       .single();
 
-    if (fetchRoleError || !existingRole) {
-      throw new AppError("Role not found in this organization.", 404, fetchRoleError || undefined);
+    if (checkError || !existingRole) {
+      throw new AppError("Role not found or does not belong to this organization.", 404);
     }
 
-    // Step 2: Prevent deletion of system roles
     if (existingRole.is_system_role) {
-      throw new AppError(`System role '${existingRole.role_name}' cannot be deleted.`, 400);
+      throw new AppError("Cannot modify system roles.", 403);
     }
 
-    // Step 3: Check if any members are currently assigned this role
-    const { count: memberCount, error: memberCheckError } = await supabase
+    // Update role name
+    const { data: updatedRole, error: updateError } = await supabase
+      .from("organization_roles")
+      .update({ role_name: roleName })
+      .eq("org_role_id", roleId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error("Error updating role name:", updateError);
+      throw new AppError("Failed to update role.", 500, updateError);
+    }
+
+    // Update permissions
+    // First, delete existing permissions
+    const { error: deleteError } = await supabase
+      .from("organization_role_permissions")
+      .delete()
+      .eq("org_role_id", roleId);
+
+    if (deleteError) {
+      console.error("Error deleting existing permissions:", deleteError);
+      throw new AppError("Failed to update role permissions.", 500, deleteError);
+    }
+
+    // Then insert new permissions
+    const rolePermissions = permission_ids.map(permissionId => ({
+      org_role_id: roleId,
+      permission_id: permissionId
+    }));
+
+    const { error: insertError } = await supabase
+      .from("organization_role_permissions")
+      .insert(rolePermissions);
+
+    if (insertError) {
+      console.error("Error inserting new permissions:", insertError);
+      throw new AppError("Failed to update role permissions.", 500, insertError);
+    }
+
+    return {
+      org_role_id: updatedRole.org_role_id,
+      role_name: updatedRole.role_name,
+      is_system_role: updatedRole.is_system_role,
+      permissions: permission_ids,
+      created_at: updatedRole.created_at,
+      updated_at: updatedRole.updated_at
+    };
+  },
+
+  async deleteOrganizationRole(orgId: string, roleId: string): Promise<void> {
+    // Check if role exists and belongs to the organization
+    const { data: existingRole, error: checkError } = await supabase
+      .from("organization_roles")
+      .select("is_system_role")
+      .eq("org_id", orgId)
+      .eq("org_role_id", roleId)
+      .single();
+
+    if (checkError || !existingRole) {
+      throw new AppError("Role not found or does not belong to this organization.", 404);
+    }
+
+    if (existingRole.is_system_role) {
+      throw new AppError("Cannot delete system roles.", 403);
+    }
+
+    // Check if role is assigned to any members
+    const { count, error: countError } = await supabase
       .from("organization_members")
       .select("*", { count: "exact", head: true })
-      .eq("org_id", orgId) // Redundant check but good practice
-      .eq("org_role_id", orgRoleId);
+      .eq("org_role_id", roleId);
 
-    if (memberCheckError) {
-      console.error(`Error checking members assigned to role ${orgRoleId}:`, memberCheckError);
-      throw new AppError("Failed to check role assignments.", 500, memberCheckError);
+    if (countError) {
+      console.error("Error checking role usage:", countError);
+      throw new AppError("Failed to check if role is in use.", 500, countError);
     }
 
-    if (memberCount && memberCount > 0) {
-      throw new AppError(
-        `Cannot delete role '${existingRole.role_name}' as it is currently assigned to ${memberCount} member(s). Please reassign members first.`,
-        409 // Conflict
-      );
+    if (count && count > 0) {
+      throw new AppError("Cannot delete role that is assigned to members.", 409);
     }
 
-    // Step 4: Delete the role (permissions associated will cascade delete due to FK constraint)
-    // Transaction recommended if more cleanup steps were needed.
+    // Delete role (cascade will handle permissions)
     const { error: deleteError } = await supabase
       .from("organization_roles")
       .delete()
-      .eq("org_role_id", orgRoleId);
+      .eq("org_role_id", roleId);
 
     if (deleteError) {
-      console.error(`Error deleting role ${orgRoleId}:`, deleteError);
+      console.error("Error deleting role:", deleteError);
       throw new AppError("Failed to delete role.", 500, deleteError);
     }
-
-    return { message: `Role '${existingRole.role_name}' deleted successfully.` };
   },
 
   async assignOrganizationMemberRole(orgId: string, memberUserId: string, newRoleId: string) {

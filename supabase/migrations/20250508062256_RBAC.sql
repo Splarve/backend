@@ -19,6 +19,7 @@ INSERT INTO public.app_permissions (permission_id, description) VALUES
     ('members:invite', 'Invite members to the organization'),
     ('members:remove', 'Remove members from the organization'),
     ('members:read', 'View organization members'),
+    ('roles:read', 'View roles for the organization'),
     ('roles:create', 'Create custom roles for the organization'),
     ('roles:edit', 'Edit custom roles for the organization (name, permissions)'),
     ('roles:delete', 'Delete custom roles for the organization'),
