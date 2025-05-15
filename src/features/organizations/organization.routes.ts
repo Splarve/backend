@@ -486,7 +486,8 @@ router.put(
       const updatedMembership = await organizationService.assignOrganizationMemberRole(
         req.org_id, 
         member_user_id,
-        newRoleId
+        newRoleId,
+        req.user.id // Pass the operator's user ID
       );
       res.status(200).json(updatedMembership);
     } catch (error) {
@@ -632,6 +633,81 @@ router.get(
       
       const members = await organizationService.listOrganizationMembers(req.org_id);
       res.status(200).json(members);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * @openapi
+ * /organizations/{org_handle}/members/{member_user_id}:
+ *   delete:
+ *     summary: Remove a member from an organization
+ *     tags: [Organizations, Members]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: org_handle
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The handle of the organization
+ *       - in: path
+ *         name: member_user_id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: The User ID of the member to remove
+ *     responses:
+ *       204:
+ *         description: Member removed successfully
+ *       400:
+ *         description: Invalid input (e.g., trying to remove self with this endpoint)
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Forbidden (user lacks 'members:remove' permission, or trying to remove member with system role)
+ *       404:
+ *         description: Organization or Member not found
+ *       500:
+ *         description: Internal server error
+ */
+router.delete(
+  "/:org_handle/members/:member_user_id",
+  authenticate,
+  (req: AuthenticatedRequest, res: Response, next: NextFunction) => { // Middleware to set org_id
+    setOrgIdFromHandle(req, res, next, req.params.org_handle ?? '');
+  },
+  validate.params(orgHandleParamSchema.merge(memberUserIdParamSchema)), // Validate path params
+  checkPermission("members:remove"), // Check permission to remove members
+  async (
+    req: AuthenticatedRequest & { org_id?: string }, 
+    res: Response, 
+    next: NextFunction
+  ) => {
+    try {
+      if (!req.user || !req.user.id) { 
+        return next(new AppError("Authentication error: User ID not found.", 401));
+      }
+      if (!req.org_id) { 
+        return next(new AppError("Organization ID not found on request.", 500));
+      }
+      const { member_user_id } = req.params; 
+
+      if (!member_user_id) {
+        // This should be caught by schema validation, but as a safeguard:
+        return next(new AppError("Member User ID is required in path.", 400));
+      }
+      
+      await organizationService.removeMemberFromOrganization(
+        req.org_id, 
+        member_user_id,
+        req.user.id // Pass the operator's user ID
+      );
+      res.status(204).send(); // 204 No Content for successful deletion
     } catch (error) {
       next(error);
     }

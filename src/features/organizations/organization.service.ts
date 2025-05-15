@@ -709,28 +709,34 @@ export const organizationService = {
     }
   },
 
-  async assignOrganizationMemberRole(orgId: string, memberUserId: string, newRoleId: string) {
-    // Step 1: Verify the newRoleId exists within this organization
-    const { data: roleData, error: roleCheckError } = await supabase
+  async assignOrganizationMemberRole(orgId: string, memberUserId: string, newRoleId: string, operatorUserId: string) {
+    // Prevent user from changing their own role
+    if (memberUserId === operatorUserId) {
+      throw new AppError("Users cannot change their own role.", 403);
+    }
+
+    // Step 1: Verify the newRoleId exists within this organization AND is not a system role
+    const { data: newRoleData, error: newRoleCheckError } = await supabase
       .from("organization_roles")
-      .select("org_role_id")
+      .select("org_role_id, is_system_role")
       .eq("org_id", orgId)
       .eq("org_role_id", newRoleId)
       .single();
     
-    if (roleCheckError || !roleData) {
-        throw new AppError("Specified role not found for this organization.", 400, roleCheckError || undefined);
+    if (newRoleCheckError || !newRoleData) {
+        throw new AppError("Specified new role not found for this organization.", 400, newRoleCheckError || undefined);
+    }
+    if (newRoleData.is_system_role) {
+      throw new AppError("Cannot assign a system role.", 403);
     }
 
-    // Step 2: Verify the memberUserId is actually a member of this organization
-    // We update the record, so Supabase update with eq filters handles this implicitly,
-    // but an explicit check can give a clearer 404.
+    // Step 2: Verify the memberUserId is actually a member of this organization AND their current role is not a system role
     const { data: memberData, error: memberCheckError } = await supabase
         .from("organization_members")
-        .select("id") // Just need to know if they exist
+        .select("id, org_role_id, roles:organization_roles (is_system_role)")
         .eq("org_id", orgId)
         .eq("user_id", memberUserId)
-        .maybeSingle(); // Use maybeSingle to not error on not found
+        .maybeSingle(); 
 
     if (memberCheckError) {
         console.error(`Error checking membership for user ${memberUserId} in org ${orgId}:`, memberCheckError);
@@ -738,6 +744,21 @@ export const organizationService = {
     }
     if (!memberData) {
         throw new AppError(`User ${memberUserId} is not a member of this organization.`, 404);
+    }
+    
+    // Check if the member's current role is a system role
+    let currentRoleIsSystem = false;
+    if (memberData.roles) {
+      const rolesData = memberData.roles as { is_system_role: boolean } | { is_system_role: boolean }[];
+      if (Array.isArray(rolesData) && rolesData.length > 0 && rolesData[0]) {
+        currentRoleIsSystem = rolesData[0].is_system_role;
+      } else if (!Array.isArray(rolesData)) {
+        currentRoleIsSystem = rolesData.is_system_role;
+      }
+    }
+
+    if (currentRoleIsSystem) {
+        throw new AppError("Cannot change the role of a member who currently has a system role.", 403);
     }
 
     // Step 3: Update the member's role
@@ -831,5 +852,60 @@ export const organizationService = {
         roleName: roleInfo?.role_name || 'N/A',
       };
     });
+  },
+
+  async removeMemberFromOrganization(orgId: string, memberUserIdToRemove: string, operatorUserId: string): Promise<void> {
+    // 1. Prevent operator from removing themselves
+    if (memberUserIdToRemove === operatorUserId) {
+      throw new AppError("Users cannot remove themselves from the organization via this action.", 403);
+    }
+
+    // 2. Verify the member exists and check their role (cannot remove if system role)
+    const { data: memberData, error: memberCheckError } = await supabase
+      .from("organization_members")
+      .select("id, org_role_id, role:organization_roles (is_system_role)") // Changed alias to 'role' for consistency
+      .eq("org_id", orgId)
+      .eq("user_id", memberUserIdToRemove)
+      .single(); 
+
+    if (memberCheckError) {
+      if (memberCheckError.code === "PGRST116") { 
+        throw new AppError(`Member with ID ${memberUserIdToRemove} not found in this organization.`, 404);
+      }
+      console.error("Error fetching member for removal check:", memberCheckError);
+      throw new AppError("Failed to verify member details before removal.", 500, memberCheckError);
+    }
+
+    // memberData should exist due to .single() throwing PGRST116 if not found, caught above.
+    // if (!memberData) { 
+    //     throw new AppError(`Member with ID ${memberUserIdToRemove} not found in this organization.`, 404);
+    // }
+    
+    let memberSystemRole = false;
+    if (memberData.role) {
+      const roleData = memberData.role as { is_system_role: boolean } | { is_system_role: boolean }[];
+      if (Array.isArray(roleData) && roleData.length > 0 && roleData[0]) {
+        memberSystemRole = roleData[0].is_system_role;
+      } else if (!Array.isArray(roleData)) {
+        memberSystemRole = roleData.is_system_role;
+      }
+    }
+
+    if (memberSystemRole) {
+      throw new AppError("Cannot remove a member who has a system role.", 403);
+    }
+
+    // 3. Proceed with deletion
+    const { error: deleteError } = await supabase
+      .from("organization_members")
+      .delete()
+      .eq("org_id", orgId)
+      .eq("user_id", memberUserIdToRemove);
+
+    if (deleteError) {
+      console.error("Error removing member from organization:", deleteError);
+      throw new AppError("Failed to remove member from organization.", 500, deleteError);
+    }
+    // Success, no return value needed for void
   }
 }; // End of organizationService 
