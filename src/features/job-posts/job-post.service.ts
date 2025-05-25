@@ -167,5 +167,21 @@ export const jobPostService = {
             throw new AppError(`Failed to search job posts`, 500);
         }
         return data || [];
+    },
+
+    async getDepartments(orgHandle: string) {
+        const orgId = await _getOrgIdByHandle(orgHandle);
+        const { data, error } = await supabase
+            .from("departments")
+            .select("department_id, department_name")
+            .eq("org_id", orgId)
+            .order("department_name");
+
+        if (error) {
+            console.error("Supabase error fetching departments:", error);
+            throw new AppError('Failed to fetch departments', 500);
+        }
+
+        return data || [];
     }
 }

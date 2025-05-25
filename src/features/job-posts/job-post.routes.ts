@@ -11,6 +11,8 @@ import { validate } from "../../lib/validation";
 import { AppError } from "../../lib/errors";
 import type { Request, Response, NextFunction } from "express";
 import { authenticate, type AuthenticatedRequest } from "../../lib/auth.middleware";
+import { setOrgIdFromRequest, checkOrganizationMembership } from "../../lib/membership.middleware";
+import { checkPermission } from "../../lib/permission.middleware";
 
 // Create a new router instance with mergeParams enabled
 const router = express.Router({ mergeParams: true });
@@ -88,6 +90,8 @@ router.get(
   "/",
   authenticate,
   validate.params(orgHandleParamSchema),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const jobPosts = await jobPostService.getAllJobPosts(req.params.org_handle!);
     res.json(jobPosts);
@@ -148,6 +152,8 @@ router.get(
   authenticate,
   validate.params(orgHandleParamSchema),
   validate.query(searchQuerySchema),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle } = req.params;
     const validatedQuery = res.locals.validatedQuery as { q: string };
@@ -198,6 +204,8 @@ router.get(
   "/:jobId",
   authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const jobPost = await jobPostService.getJobPostById(org_handle!, jobId!);
@@ -253,6 +261,9 @@ router.post(
   authenticate,
   validate.params(orgHandleParamSchema),
   validate.body(createJobPostSchema),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
+  checkPermission("job-posts:create"),
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle } = req.params;
     const newJobPost = await jobPostService.createJobPost(org_handle!, req.body);
@@ -311,6 +322,9 @@ router.put(
   authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
   validate.body(updateJobPostSchema),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
+  checkPermission("job-posts:edit"),
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const updatedJobPost = await jobPostService.updateJobPost(org_handle!, jobId!, req.body);
@@ -362,10 +376,64 @@ router.delete(
   "/:jobId",
   authenticate,
   validate.params(orgHandleParamSchema.merge(jobIdParamSchema)),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
+  checkPermission("job-posts:delete"),
   handleErrors(async (req: AuthenticatedRequest, res: Response) => {
     const { org_handle, jobId } = req.params;
     const deletedJobPost = await jobPostService.deleteJobPost(org_handle!, jobId!);
     res.json(deletedJobPost);
+  })
+);
+
+// Get departments for the organization (needed for job post creation/editing)
+/**
+ * @openapi
+ * /organizations/{org_handle}/job-posts/departments:
+ *   get:
+ *     tags:
+ *       - Job Posts
+ *     summary: Get departments for job post creation
+ *     description: Retrieves all departments for the organization to use in job post forms.
+ *     parameters:
+ *       - name: org_handle
+ *         in: path
+ *         required: true
+ *         description: The handle of the organization.
+ *         schema:
+ *           type: string
+ *           pattern: '^[a-z0-9-]+$'
+ *     responses:
+ *       200:
+ *         description: A list of departments.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   department_id:
+ *                     type: string
+ *                     format: uuid
+ *                   department_name:
+ *                     type: string
+ *       404:
+ *         description: Organization not found.
+ *       500:
+ *         description: Internal Server Error.
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get(
+  "/departments",
+  authenticate,
+  validate.params(orgHandleParamSchema),
+  setOrgIdFromRequest,
+  checkOrganizationMembership,
+  handleErrors(async (req: AuthenticatedRequest, res: Response) => {
+    const departments = await jobPostService.getDepartments(req.params.org_handle!);
+    res.json(departments);
   })
 );
 

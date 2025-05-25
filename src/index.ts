@@ -6,6 +6,7 @@ import { jobPostRouter } from './features/job-posts';
 import { orgSettingsRouter } from './features/org-settings';
 import { organizationRouter, invitationActionsRouter, appPermissionsRouter } from './features/organizations';
 import { currentUserRouter } from './features/currentUser';
+import { departmentRouter } from './features/departments';
 
 // Initialize express app
 const app = express();
@@ -97,6 +98,7 @@ app.use('/api/v1/app-permissions', appPermissionsRouter);
 app.use('/api/v1/organizations', organizationRouter);
 app.use('/api/v1/invitations', invitationActionsRouter);
 app.use('/api/v1/organizations/:org_handle/job-posts', jobPostRouter);
+app.use('/api/v1/organizations/:org_handle/departments', departmentRouter);
 app.use('/api/v1/organizations/:org_handle/settings', orgSettingsRouter);
 app.use('/api/v1/me', currentUserRouter);
 
